@@ -171,10 +171,10 @@ include("boundingbox.jl")
 
 struct GeneralSystem <: AbstractSystemType end
 
-mutable struct System{D, F<:AbstractFloat, SysType<:AbstractSystemType} <: AbstractSystem{D, F, SysType}
+mutable struct System{D, F<:AbstractFloat, SysType<:AbstractSystemType, L} <: AbstractSystem{D, F, SysType}
     time::F
     topology::SimpleWeightedGraph{Int64, Rational{BO_Precision}}
-    box::BoundingBox{D, F}
+    box::BoundingBox{D, F, L}
 
     # atom property
     position::Position{D, F}
@@ -187,7 +187,7 @@ mutable struct System{D, F<:AbstractFloat, SysType<:AbstractSystemType} <: Abstr
 end
 
 function System{D, F, SysType}() where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
-    System{D, F, SysType}(
+    System{D, F, SysType, D*D}(
         zero(F),
         SimpleWeightedGraph{Int64, Rational{BO_Precision}}(),
         BoundingBox{D, F}(),
@@ -204,19 +204,19 @@ function System{D, F}() where {D, F<:AbstractFloat}
     return System{D, F, GeneralSystem}()
 end
 
-function dimension(s::System{D, F, SysType}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
+function dimension(s::System{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     return D
 end
 
-function precision(s::System{D, F, SysType}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
+function precision(s::System{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     return F
 end
 
-function system_type(s::System{D, F, SysType}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
+function system_type(s::System{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     return SysType
 end
 
-function Base.similar(s::System{D, F, SysType}; reserve_dynamic::Bool=false, reserve_static::Bool=false) where {D, F, SysType}
+function Base.similar(s::System{D, F, SysType, L}; reserve_dynamic::Bool=false, reserve_static::Bool=false) where {D, F, SysType, L}
     sim = System{D, F, SysType}()
     if reserve_dynamic
         set_time!(sim, time(s))
@@ -234,8 +234,8 @@ function Base.similar(s::System{D, F, SysType}; reserve_dynamic::Bool=false, res
     return deepcopy(sim)
 end
 
-function Base.show(io::IO, ::MIME"text/plain", s::System{D, F, SysType}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
-    "System{$D, $F}
+function Base.show(io::IO, ::MIME"text/plain", s::System{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
+    "System{$D, $F, $SysType}
         time: $(time(s))
         bbox: $(box(s))
         natoms: $(natom(s))
@@ -265,7 +265,7 @@ function topology(s::System)
     s.topology
 end
 
-function box(s::System)
+function box(s::System{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     s.box
 end
 
@@ -365,37 +365,37 @@ function _change_wrap!(s::System)
     s.wrapped = !(s.wrapped)
 end
 
-function wrap!(s::System)
+function _frac_int_vector(mods::SVector{D, Tuple{F, F}}) where {D, F<:AbstractFloat}
+    return SVector{D, F}(mods[i][1] for i in 1:D), SVector{D, Int16}(Int16(mods[i][2]) for i in 1:D)
+end
+
+function wrap!(s::System{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     if wrapped(s)
         return nothing
     end
 
     axis = box(s).axis
     origin = box(s).origin
-    # x = c[1] .* axis[:,1] .+ c[2] .* axis[:,2] .+ ...
-    e_i_e_j = [dot(axis[:,i], axis[:,j]) for i in 1:dimension(s), j in 1:dimension(s)] |> Symmetric
+    ## x = c[1] .* axis[:,1] .+ c[2] .* axis[:,2] .+ ...
+    e_i_e_j = SMatrix{D, D, F, D*D}(
+        dot(axis[:,i], axis[:,j]) for i in 1:D, j in 1:D
+    ) #|> Symmetric
     for id in 1:natom(s)
-        x = position(s, id) .- origin
-        c = e_i_e_j \ [dot(x, axis[:,dim]) for dim in 1:dimension(s)]
-        travel = floor.(Int16, c) #trunc.(Int16, c)
-        set_travel!(s, id, travel)
-        digit = c .- travel
-        pos = map(1:dimension(s)) do dim
-            #if digit[dim] >= 0
-            #    digit[dim] .* axis[:,dim]
-            #else
-            #    (digit[dim] + 1) .* axis[:,dim]
-            #end
-            digit[dim] .* axis[:,dim]
-        end |> p-> reduce(.+, p)
-        set_position!(s, id, pos .+ origin)
+        x = position(s, id) - origin
+        c = e_i_e_j \ SVector{D, F}(dot(x, axis[:,dim]) for dim in 1:D)
+        fparts, iparts = _frac_int_vector(modf.(c))
+        pos = map(1:D) do dim
+            @inbounds fparts[dim] * axis[:,dim]
+        end |> p->reduce(+, p)
+        set_travel!(s, id, iparts)
+        set_position!(s, id, pos + origin)
     end
     _change_wrap!(s)
 
     return nothing
 end
 
-function unwrap!(s::System)
+function unwrap!(s::System{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     if !wrapped(s)
         return nothing
     end
@@ -403,10 +403,10 @@ function unwrap!(s::System)
     axis   = box(s).axis
     origin = box(s).origin
     for i in 1:natom(s)
-        x = position(s, i) .- origin
+        x = position(s, i) - origin
         n = travel(s, i)
-        pos = x .+ mapreduce(dim -> n[dim] .* axis[:, dim], .+, 1:dimension(s))
-        set_position!(s, i, pos .+ origin)
+        pos = x + mapreduce(dim -> n[dim] * axis[:, dim], +, 1:D)
+        set_position!(s, i, pos + origin)
         set_travel!(s, i, zeros(Int16, 3))
     end
     _change_wrap!(s)

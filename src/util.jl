@@ -1,20 +1,20 @@
-function sort(eiter::AbstractEdgeIter)
-    edge_array = collect(eiter)
-    sort!(edge_array; by = x -> src(x))
-
-    current = src(edge_array[1])
-    index = 1
-    for (i, edge) in enumerate(edge_array)
-        if src(edge) != current
-            sub = view(edge_array, index:i-1)
-            sort!(sub; by = x -> dst(x))
-            index = i
-            current = src(edge)
-        end
-    end
-
-    return edge_array
-end
+#function sort(eiter::AbstractEdgeIter)
+#    edge_array = collect(eiter)
+#    sort!(edge_array; by = x -> src(x))
+#
+#    current = src(edge_array[1])
+#    index = 1
+#    for (i, edge) in enumerate(edge_array)
+#        if src(edge) != current
+#            sub = view(edge_array, index:i-1)
+#            sort!(sub; by = x -> dst(x))
+#            index = i
+#            current = src(edge)
+#        end
+#    end
+#
+#    return edge_array
+#end
 
 function oblique_coord(x::AbstractVector, origin, axis)
     # x = α * axis[:, 1] + β * axis[:, 2] + γ * axis[:, 3]

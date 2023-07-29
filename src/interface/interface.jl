@@ -18,7 +18,7 @@ _NI(m) = throw(NotImplementedError(m))
 abstract type AbstractSystemType end
 abstract type AbstractSystem{D, F<:AbstractFloat, SysType<:AbstractSystemType} end
 abstract type AbstractTrajectory{D, F<:AbstractFloat, SysType<:AbstractSystemType} end
-abstract type AbstractBbox{D, F<:AbstractFloat} end
+abstract type AbstractBbox{D, F<:AbstractFloat, L} end
 
 # system core interface
 dimension(s::AbstractSystem) = _NI("dimension")

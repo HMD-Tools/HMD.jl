@@ -78,7 +78,7 @@ function get_file(file_handler::H5system)
     return file_handler.file
 end
 
-function hmdsave(file_handler::H5system, s::System{D, F, SysType}; compress=false) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
+function hmdsave(file_handler::H5system, s::System{D, F, SysType, L}; compress=false) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     if compress
         @warn "warning: compression is not supported yet. ignoring..."
     end
@@ -129,7 +129,7 @@ function hmdsave(file_handler::H5system, s::System{D, F, SysType}; compress=fals
     return nothing
 end
 
-function read_system(system_file::H5system, template::System{D, F, SysType}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
+function read_system(system_file::H5system, template::System{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     # metadata check
     D_file, F_file, SysType_file = get_metadata(system_file)
     if (D_file, F_file) != (D, F)
@@ -144,7 +144,7 @@ function read_system(system_file::H5system, template::System{D, F, SysType}) whe
     return s
 end
 
-function import_dynamic!(s::System{D, F, SysType}, system_file::H5system) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
+function import_dynamic!(s::System{D, F, SysType, L}, system_file::H5system) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     file = get_file(system_file)
     set_time!(s, read(file, "time"))
     set_box!(s, BoundingBox{D, F}(read(file, "box/origin"), read(file, "box/axis")))
@@ -159,7 +159,7 @@ function import_dynamic!(s::System{D, F, SysType}, system_file::H5system) where 
     return nothing
 end
 
-function import_static!(s::System{D, F, SysType}, system_file::H5system) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
+function import_static!(s::System{D, F, SysType, L}, system_file::H5system) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     file = get_file(system_file)
     #s.element = deserialize(read(file, "element/chars"), read(file, "element/bounds"))
     s.element = read(file, "element")

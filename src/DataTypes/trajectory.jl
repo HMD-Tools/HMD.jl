@@ -14,36 +14,36 @@ export add_snapshot!, get_timesteps, get_reactions, get_metadata
 # -> 2を採用(2の内部で結局1と同じことを実行する)
 
 
-Base.@kwdef mutable struct Trajectory{D, F<:AbstractFloat, SysType<:AbstractSystemType} <: AbstractTrajectory{D, F, SysType}
+Base.@kwdef mutable struct Trajectory{D, F<:AbstractFloat, SysType<:AbstractSystemType, L} <: AbstractTrajectory{D, F, SysType}
     # Vector of System. Properties which does not changes at evety timestep are empty except for reactions.
-    systems::Vector{System{D, F, SysType}} = System{D, F, SysType}[]
+    systems::Vector{System{D, F, SysType, L}} = System{D, F, SysType, L}[]
     # indices corresponding to reactions (not timestep!)
     is_reaction::Vector{Int64} = Vector{Int64}(undef, 0)
     # index -> timestep
     timesteps::Vector{Int64} = Vector{Int64}(undef, 0)
 end
 
-function Trajectory(s::System{D, F, SysType}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
-    return Trajectory{D, F, SysType}([s], [1], [1])
+function Trajectory(s::System{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
+    return Trajectory{D, F, SysType, L}([s], [1], [1])
 end
 
-function empty_trajectory(s::System{D, F, SysType}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
-    return Trajectory{D, F, SysType}()
+function empty_trajectory(s::System{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
+    return Trajectory{D, F, SysType, L}()
 end
 
-function is_reaction(traj::Trajectory{D, F, SysType}, index::Integer) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
+function is_reaction(traj::Trajectory{D, F, SysType, L}, index::Integer) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     return index ∈ traj.is_reaction
 end
 
-function get_system(traj::Trajectory{D, F, SysType}, index::Integer) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
+function get_system(traj::Trajectory{D, F, SysType, L}, index::Integer) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     return traj.systems[index]
 end
 
-function all_timesteps(traj::Trajectory{D, F, SysType}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
+function all_timesteps(traj::Trajectory{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     return traj.timesteps
 end
 
-function get_timestep(traj::Trajectory{D, F, SysType}, index::Integer) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
+function get_timestep(traj::Trajectory{D, F, SysType, L}, index::Integer) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     return all_timesteps(traj)[index]
 end
 
@@ -51,11 +51,11 @@ function prop(traj::Trajectory, index::Integer, pname::AbstractString)
     return prop(get_system(traj, index), pname)
 end
 
-function Base.length(traj::Trajectory{D, F, SysType}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
+function Base.length(traj::Trajectory{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     return length(traj.systems)
 end
 
-function add!(traj::Trajectory{D, F, SysType}, s::System{D, F, SysType}, timestep::Integer; reaction=false) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
+function add!(traj::Trajectory{D, F, SysType, L}, s::System{D, F, SysType, L}, timestep::Integer; reaction=false) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     @assert length(traj.systems) == length(traj.timesteps)
     if length(traj) > 0
         @assert traj.is_reaction[end] <= length(traj)
@@ -88,8 +88,8 @@ function add!(traj::Trajectory{D, F, SysType}, s::System{D, F, SysType}, timeste
 end
 
 function add!(
-    traj::Trajectory{D, F, SysType}, addend::Trajectory{D, F, SysType}
-) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
+    traj::Trajectory{D, F, SysType, L}, addend::Trajectory{D, F, SysType, L}
+) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     if topology(traj.systems[1]) != topology(addend.systems[1])
         error("topology of traj and addend are not compatible. ")
     end
@@ -129,7 +129,7 @@ function import_static!(reader::System{D, F, S1}, traj::Trajectory{D, F, S2}, in
     return nothing
 end
 
-function latest_reaction(traj::Trajectory{D, F, SysType}, index::Integer) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
+function latest_reaction(traj::Trajectory{D, F, SysType, L}, index::Integer) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     if !(1 <= index <= length(traj))
         error("index $index ∉ [1, $(length(traj))]")
     end
@@ -143,11 +143,11 @@ end
 #    return all_elements(s) |> isempty
 #end
 
-function Base.similar(traj::Trajectory{D, F, SysType}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
+function Base.similar(traj::Trajectory{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     return Trajectory{D, F, SysType}()
 end
 
-function similar_system(traj::Trajectory{D, F, SysType}; reserve_dynamic=false, reserve_static=false) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
+function similar_system(traj::Trajectory{D, F, SysType, L}; reserve_dynamic=false, reserve_static=false) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     s = System{D, F, SysType}()
 
     if reserve_dynamic
@@ -159,25 +159,25 @@ function similar_system(traj::Trajectory{D, F, SysType}; reserve_dynamic=false, 
     return deepcopy(s)
 end
 
-function dimension(traj::Trajectory{D, F, SysType}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
+function dimension(traj::Trajectory{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     return D
 end
 
-function precision(traj::Trajectory{D, F, SysType}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
+function precision(traj::Trajectory{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     return F
 end
 
-function system_type(traj::Trajectory{D, F, SysType}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
+function system_type(traj::Trajectory{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     return SysType
 end
 
-function wrapped(traj::Trajectory{D, F, SysType}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
+function wrapped(traj::Trajectory{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     is_wrapped = wrapped(traj.systems[1])
     @assert all(i -> wrapped(traj.systems[i]) == is_wrapped, 1:length(traj))
     return is_wrapped
 end
 
-function wrap!(traj::Trajectory{D, F, SysType}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
+function wrap!(traj::Trajectory{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     if !wrapped(traj)
         for i in 1:length(traj)
             wrap!(traj.systems[i])
@@ -187,7 +187,7 @@ function wrap!(traj::Trajectory{D, F, SysType}) where {D, F<:AbstractFloat, SysT
     return nothing
 end
 
-function unwrap!(traj::Trajectory{D, F, SysType}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
+function unwrap!(traj::Trajectory{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     if wrapped(traj)
         for i in 1:length(traj)
             unwrap!(traj.systems[i])
@@ -224,7 +224,7 @@ function get_file(file_handler::H5traj)
     return file_handler.file
 end
 
-function add_snapshot!(file_handler::H5traj, s::System{D, F, SysType}, step::Int64; reaction::Bool=false, unsafe::Bool=false) where{D, F<:AbstractFloat, SysType<:AbstractSystemType}
+function add_snapshot!(file_handler::H5traj, s::System{D, F, SysType, L}, step::Int64; reaction::Bool=false, unsafe::Bool=false) where{D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     file = get_file(file_handler)
     # construction
     if keys(file) |> isempty
@@ -253,7 +253,7 @@ function add_snapshot!(file_handler::H5traj, s::System{D, F, SysType}, step::Int
     return nothing
 end
 
-function import_dynamic!(reader::System{D, F, S}, traj_file::H5traj; index::Int64=typemin(Int64), step::Int64=typemin(Int64)) where {D, F<:AbstractFloat, S<:AbstractSystemType}
+function import_dynamic!(reader::System{D, F, S, L}, traj_file::H5traj; index::Int64=typemin(Int64), step::Int64=typemin(Int64)) where {D, F<:AbstractFloat, S<:AbstractSystemType, L}
     if index != typemin(Int64) && step == typemin(Int64)
         step = get_timesteps(traj_file)[index]
     elseif index == typemin(Int64) && step != typemin(Int64)
@@ -274,7 +274,7 @@ function import_dynamic!(reader::System{D, F, S}, traj_file::H5traj; index::Int6
     return nothing
 end
 
-function import_static!(reader::System{D, F, S}, traj_file::H5traj; index::Int64=typemin(Int64), step::Int64=typemin(Int64)) where {D, F<:AbstractFloat, S<:AbstractSystemType}
+function import_static!(reader::System{D, F, S, L}, traj_file::H5traj; index::Int64=typemin(Int64), step::Int64=typemin(Int64)) where {D, F<:AbstractFloat, S<:AbstractSystemType, L}
     if index != typemin(Int64) && step == typemin(Int64)
         step = get_timesteps(traj_file)[index]
     elseif index == typemin(Int64) && step != typemin(Int64)
@@ -323,7 +323,7 @@ function get_metadata(traj_file::H5traj)
     return D, F, SysType
 end
 
-function _error_chk(file, reader::System{D, F, SysType}; mode) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
+function _error_chk(file, reader::System{D, F, SysType, L}; mode) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     if read(file, "infotrype") != "Trajectory"
         error("The file is not a trajectory file. ")
     elseif read(file, "dimension") != dimension(reader)
