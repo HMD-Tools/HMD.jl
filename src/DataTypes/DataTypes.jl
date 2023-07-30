@@ -378,27 +378,20 @@ function wrap!(s::System{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<
 
     axis = box(s).axis
     origin = box(s).origin
-    ## x = c[1] .* axis[:,1] .+ c[2] .* axis[:,2] .+ ...
-    e_i_e_j = SMatrix{D, D, F, D*D}(
-        dot(axis[:,i], axis[:,j]) for i in 1:D, j in 1:D
-    ) #|> Symmetric
     for id in 1:natom(s)
-        x = position(s, id) - origin
-        c = e_i_e_j \ SVector{D, F}(dot(x, axis[:,dim]) for dim in 1:D)
+        # convert coordinates from Cartesian to box vectors i.e.
+        # x = c[1] .* axis[:,1] .+ c[2] .* axis[:,2] .+ ...
+        c = _box_coord(position(s, id), box(s))
         iparts, fparts = _floor_rem(c)
         pos = map(1:D) do dim
             fparts[dim] * axis[:,dim]
         end |> p->reduce(+, p)
         set_travel!(s, id, iparts)
-        set_position!(s, id, pos + origin)
+        set_position!(s, id, pos)
     end
     _change_wrap!(s)
 
     return nothing
-end
-
-function wrap_symolic!(s::System{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
-    
 end
 
 function unwrap!(s::System{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
@@ -418,6 +411,36 @@ function unwrap!(s::System{D, F, SysType, L}) where {D, F<:AbstractFloat, SysTyp
     _change_wrap!(s)
 
     return nothing
+end
+
+"""
+convert coordinates from Cartesian to box vectors.
+
+Math equation is calculated by below code with Symbolics.jl
+
+# code
+```julia-repl
+    using Symbolics
+    @variables p₁ p₂ p₃ # position
+    @variables a₁ a₂ a₃ b₁ b₂ b₃ c₁ c₂ c₃ # box vectors
+    @variables o₁ o₂ o₃  # box origin
+    @variables α β γ # coefficients
+    eq₁ = p₁ ~ α*a₁ + β*b₁ + γ*c₁ + o₁
+    eq₂ = p₂ ~ α*a₂ + β*b₂ + γ*c₂ + o₂
+    eq₃ = p₃ ~ α*a₃ + β*b₃ + γ*c₃ + o₃
+    equations = Symbolics.solve_for([eq₁ eq₂ eq₃], [α, β, γ]; simplify=true)
+```
+"""
+@inline function _box_coord(p::SVector{3, F}, box::BoundingBox{3, F, 9}) where {F<:AbstractFloat}
+    a, b, c = box.axis[:,1], box.axis[:,2], box.axis[:,3]
+    o = box.origin
+    inv = 1 / (a[2]*b[3]*c[1] + a[3]*b[1]*c[2] + a[1]*b[2]*c[3] - a[1]*b[3]*c[2] - a[2]*b[1]*c[3] - a[3]*b[2]*c[1])
+
+    α = inv * (b[2]*c[1]*o[3] + b[3]*c[2]*o[1] + b[3]*c[1]*p[2] + b[1]*c[2]*p[3] + b[1]*c[3]*o[2] + b[2]*c[3]*p[1] - b[2]*c[1]*p[3] - b[2]*c[3]*o[1] - b[3]*c[1]*o[2] - b[1]*c[2]*o[3] - b[1]*c[3]*p[2] - b[3]*c[2]*p[1])
+    β = inv * (a[3]*c[1]*o[2] + a[1]*c[2]*o[3] + a[1]*c[3]*p[2] + a[3]*c[2]*p[1] + a[2]*c[1]*p[3] + a[2]*c[3]*o[1] - a[2]*c[1]*o[3] - a[3]*c[1]*p[2] - a[1]*c[2]*p[3] - a[1]*c[3]*o[2] - a[2]*c[3]*p[1] - a[3]*c[2]*o[1])
+    γ = inv * (a[2]*b[1]*o[3] + a[3]*b[1]*p[2] + a[1]*b[3]*o[2] + a[2]*b[3]*p[1] + a[1]*b[2]*p[3] + a[3]*b[2]*o[1] - a[1]*b[2]*o[3] - a[3]*b[1]*o[2] - a[3]*b[2]*p[1] - a[2]*b[3]*o[1] - a[1]*b[3]*p[2] - a[2]*b[1]*p[3])
+
+    return SVector{3, F}(α, β, γ)
 end
 
 function label2atom(s::System, hname::AbstractString, label::HLabel)
