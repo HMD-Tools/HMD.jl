@@ -365,8 +365,10 @@ function _change_wrap!(s::System)
     s.wrapped = !(s.wrapped)
 end
 
-function _frac_int_vector(mods::SVector{D, Tuple{F, F}}) where {D, F<:AbstractFloat}
-    return SVector{D, F}(mods[i][1] for i in 1:D), SVector{D, Int16}(Int16(mods[i][2]) for i in 1:D)
+function _floor_rem(c::SVector{D, F}) where {D, F<:AbstractFloat}
+    ipart = SVector{D, Int16}(Int16(floor(x)) for x in c)
+    fpart = c - ipart
+    return ipart, fpart
 end
 
 function wrap!(s::System{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
@@ -383,9 +385,9 @@ function wrap!(s::System{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<
     for id in 1:natom(s)
         x = position(s, id) - origin
         c = e_i_e_j \ SVector{D, F}(dot(x, axis[:,dim]) for dim in 1:D)
-        fparts, iparts = _frac_int_vector(modf.(c))
+        iparts, fparts = _floor_rem(c)
         pos = map(1:D) do dim
-            @inbounds fparts[dim] * axis[:,dim]
+            fparts[dim] * axis[:,dim]
         end |> p->reduce(+, p)
         set_travel!(s, id, iparts)
         set_position!(s, id, pos + origin)
@@ -393,6 +395,10 @@ function wrap!(s::System{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<
     _change_wrap!(s)
 
     return nothing
+end
+
+function wrap_symolic!(s::System{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
+    
 end
 
 function unwrap!(s::System{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
