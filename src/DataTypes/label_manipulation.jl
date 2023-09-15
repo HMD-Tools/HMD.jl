@@ -142,10 +142,10 @@ end
 
 function super(s::System, hname::AbstractString, label::HLabel; recurse::Bool=false)
     lh = hierarchy(s, hname)
-    return _super(lh, label)
+    return _super(lh, label; recurse=recurse)
 end
 
 function sub(s::System, hname::AbstractString, label::HLabel; recurse::Bool=false)
     lh = hierarchy(s, hname)
-    return _sub(lh, label)
+    return _sub(lh, label; recurse=recurse)
 end
