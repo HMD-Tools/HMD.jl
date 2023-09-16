@@ -253,33 +253,13 @@ function _sub_id(lh::LabelHierarchy, label::HLabel)
 end
 
 function _super(lh::LabelHierarchy, label::HLabel; recurse::Bool=false)
-    result = HLabel[]
-    buffer = _labels(lh)[_super_id(lh, label)]
-    if !recurse
-        return buffer
-    end
-    while !isempty(buffer)
-        current = popfirst!(buffer)
-        pushfirst!(result, current)
-        prepend!(buffer, _super(lh, current))
-    end
-
-    return result
+    super_ids = _super_id(lh, label)
+    return _labels(lh)[super_ids]
 end
 
 function _sub(lh::LabelHierarchy, label::HLabel; recurse::Bool=false)
-    result = HLabel[]
-    buffer = _labels(lh)[_super_id(lh, label)]
-    if !recurse
-        return buffer
-    end
-    while !isempty(buffer)
-        current = popfirst!(buffer)
-        pushfirst!(result, current)
-        prepend!(buffer, _sub(lh, current))
-    end
-
-    return result
+    sub_ids = _sub_id(lh, label)
+    return _labels(lh)[sub_ids]
 end
 
 function _issuper(lh::LabelHierarchy, lhs::HLabel, rhs::HLabel)

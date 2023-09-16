@@ -77,8 +77,8 @@ remove_relation!(s::AbstractSystem, hname::AbstractString, super::HLabel, sub::H
 contains(s::AbstractSystem, hname::AbstractString, label::HLabel) = _NI("contains")
 issuper(s::AbstractSystem, hname::AbstractString, label1::HLabel, label2::HLabel) = _NI("issuper")
 issub(s::AbstractSystem, hname::AbstractString, label1::HLabel, label2::HLabel) = _NI("issub")
-super(s::AbstractSystem, hname::AbstractString, label::HLabel; recurse::Bool=false) = _NI("super")
-sub(s::AbstractSystem, hname::AbstractString, label::HLabel; recurse::Bool=false) = _NI("sub")
+super(s::AbstractSystem, hname::AbstractString, label::HLabel) = _NI("super")
+sub(s::AbstractSystem, hname::AbstractString, label::HLabel) = _NI("sub")
 
 # system property interface
 prop_names(s::AbstractSystem) = NI("prop_names")

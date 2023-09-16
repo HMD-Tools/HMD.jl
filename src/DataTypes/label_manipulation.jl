@@ -140,12 +140,12 @@ function issub(s::System, hname::AbstractString, label1::HLabel, label2::HLabel)
     return _issub(lh, label1, label2)
 end
 
-function super(s::System, hname::AbstractString, label::HLabel; recurse::Bool=false)
+function super(s::System, hname::AbstractString, label::HLabel)
     lh = hierarchy(s, hname)
-    return _super(lh, label; recurse=recurse)
+    return _super(lh, label)
 end
 
-function sub(s::System, hname::AbstractString, label::HLabel; recurse::Bool=false)
+function sub(s::System, hname::AbstractString, label::HLabel)
     lh = hierarchy(s, hname)
-    return _sub(lh, label; recurse=recurse)
+    return _sub(lh, label)
 end

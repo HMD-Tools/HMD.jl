@@ -1,3 +1,5 @@
+@reexport import .DataTypes: super, sub
+
 const Entire_System = HLabel("entire_system", 1)
 
 #const atom_mass = Dict{String, Float64}(
