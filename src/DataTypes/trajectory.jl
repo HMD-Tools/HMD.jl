@@ -1,7 +1,7 @@
 export Trajectory
 export all_timesteps, get_timestep, is_reaction, get_system
 export latest_reaction, latest_reaction_step, add!, update_reader!, add!
-export setproperty!, iterate, getindex, length
+export setproperty!, length
 export add_snapshot!, get_timesteps, get_reactions, get_metadata
 
 #use case
@@ -144,7 +144,7 @@ end
 #end
 
 function Base.similar(traj::Trajectory{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
-    return Trajectory{D, F, SysType}()
+    return Trajectory{D, F, SysType, L}()
 end
 
 function similar_system(traj::Trajectory{D, F, SysType, L}; reserve_dynamic=false, reserve_static=false) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
@@ -224,8 +224,15 @@ function get_file(file_handler::H5traj)
     return file_handler.file
 end
 
-function add_snapshot!(file_handler::H5traj, s::System{D, F, SysType, L}, step::Int64; reaction::Bool=false, unsafe::Bool=false) where{D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
+function add_snapshot!(
+    file_handler::H5traj,
+    s::System{D, F, SysType, L},
+    step::Int64;
+    reaction::Bool = false,
+    unsafe::Bool = false
+) where{D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     file = get_file(file_handler)
+
     # construction
     if keys(file) |> isempty
         file["infotype"] = "Trajectory"

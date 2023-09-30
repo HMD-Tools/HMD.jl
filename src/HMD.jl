@@ -1,13 +1,14 @@
 module HMD
 
-using Graphs
+using Reexport
+
+@reexport using Graphs
 using HDF5
 using LinearAlgebra
-using PeriodicTable
-using Reexport
-using SimpleWeightedGraphs
+@reexport using PeriodicTable
+@reexport using SimpleWeightedGraphs
 using StaticArrays
-using Unitful
+@reexport using Unitful
 
 import Base: getindex, firstindex, lastindex, setproperty!, iterate, length, precision, close, string, show, showerror
 import Base: >, <, >=, <=, +, -, *, /, ==, position

@@ -152,7 +152,7 @@ function import_dynamic!(s::System{D, F, SysType, L}, system_file::H5system) whe
     s.travel = deserialize(D, read(file, "travel"))
     s.wrapped = read(file, "wrapped")
 
-    for pname in file["property_names"]
+    for pname in read(file, "property_names")
         set_prop!(s, pname, read(file, "props/$pname"))
     end
 

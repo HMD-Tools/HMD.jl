@@ -31,6 +31,20 @@ function getindex(traj::AbstractTrajectory{D, F, SysType}, index::Integer) where
     return replica
 end
 
+function getindex(
+    traj::AbstractTrajectory{D, F, SysType},
+    rng::AbstractUnitRange{I}
+) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, I<:Integer}
+    slice = empty_trajectory(traj[1])
+    for (i, itr) in enumerate(traj)
+        i ∉ rng && continue
+        snap = deepcopy(itr.reader)
+        add!(slice, snap, itr.step; reaction=is_reaction(traj, i))
+    end
+
+    return slice
+end
+
 function Base.iterate(traj::AbstractTrajectory{D, F, SysType}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
     index = 1
     reader = similar_system(traj)
@@ -79,12 +93,17 @@ function hmdsave(name::AbstractString, traj::AbstractTrajectory{D, F, SysType}) 
     close(file_handler)
 end
 
+function read_traj(name::AbstractString, D::Integer, F::Type{<:AbstractFloat}, S::Type{<:AbstractSystemType})
+    template = Trajectory{D, F, S, D*D}()
+    return read_traj(name, template)
+end
+
 function read_traj(name::AbstractString, template::AbstractTrajectory{D, F, SysType}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
     traj_file = h5traj(name, "r")
 
     D_file, F_file, SysType_file = get_metadata(traj_file)
-    if (D_file, F_file) != (D, F)
-        error("Trajectory file type ($D_file, $F_file) is not compatible with the template type ($D, $F).")
+    if (D_file, F_file, SysType_file) != (D, F, string(SysType))
+        error("Trajectory file type ($D_file, $F_file, $SysType_file) is not compatible with the template type ($D, $F, $SysType).")
     end
 
     traj = similar(template)
@@ -148,32 +167,3 @@ function Base.iterate(traj_file::AbstractFileFormat, state::Tuple{Int64, Vector{
 
     return (step=timesteps[index], reader=reader), (index+1, reaction_steps, timesteps, static_cache)
 end
-
-# getindex?
-#function slice(traj::AbstractTrajectory, index::Integer)
-#
-#end
-#
-#function slice(traj::AbstractTrajectory, time::AbstractFloat)
-#
-#end
-#
-#function to_system(traj::AbstractTrajectory)
-#
-#end
-#
-#function nearest_slice(traj::AbstractTrajectory, time::AbstractFloat)
-#
-#end
-#
-#function Base.push!(traj::AbstractTrajectory{D, F, SysType}, s::AbstractSystem{D, F, SysType}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
-#
-#end
-#
-#function Base.append!(addend::AbstractTrajectory{D, F, SysType}, augend::AbstractTrajectory{D, F, SysType}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
-#
-#end
-#
-#function Base.append!(addend::AbstractTrajectory{D, F, SysType}, augend::AbstractTrajectory{D, F, SysType}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
-#
-#end
