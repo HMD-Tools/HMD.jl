@@ -196,9 +196,13 @@ end
 ##### System HDF5 interface
 #####
 
-function hmdsave(name::AbstractString, s::AbstractSystem{D, F, SysType}; compress=false) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
+function hmdsave(
+    name::AbstractString,
+    s::AbstractSystem{D, F, SysType};
+    compress=false
+) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
     file = h5system(name, "w")
-    DataTypes.hmdsave(file, s; compress=compress)
+    DataTypes.hmdsave(file, s; compress=compress, precision=precision)
     close(file)
 
     return nothing

@@ -143,12 +143,22 @@ end
 #    return all_elements(s) |> isempty
 #end
 
-function Base.similar(traj::Trajectory{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
-    return Trajectory{D, F, SysType, L}()
+function similar(
+    traj::Trajectory{D, F, SysType, L};
+    precision::Union{Type{<:AbstractFloat}, Nothing} = nothing
+) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
+    T = isnothing(precision) ? F : precision
+    return Trajectory{D, T, SysType, L}()
 end
 
-function similar_system(traj::Trajectory{D, F, SysType, L}; reserve_dynamic=false, reserve_static=false) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
-    s = System{D, F, SysType}()
+function similar_system(
+    traj::Trajectory{D, F, SysType, L};
+    reserve_dynamic = false,
+    reserve_static = false,
+    precision::Union{Type{<:AbstractFloat}, Nothing} = nothing
+) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
+    T = isnothing(precision) ? F : precision
+    s = System{D, T, SysType}()
 
     if reserve_dynamic
         import_dynamic!(s, traj, 1)
@@ -247,15 +257,20 @@ function add_snapshot!(
     end
 
     # trajectory specific properties
+    create_group(file, "snapshots/$step")
+    snap = H5system(file["snapshots/$step"])
     if reaction
         if nv(topology(s))==0 && isempty(all_elements(s)) # && isempty(hierarchy(s))
             error("system's topology, hierarychy and elements are empty. ")
         end
         create_group(file, "reactions/$step")
+        hmdsave(snap, s)
+    else
+        hmdsave(
+            snap,
+            similar(s, reserve_dynamic=true, reserve_static=false)
+        )
     end
-    create_group(file, "snapshots/$step")
-    snap = H5system(file["snapshots/$step"])
-    hmdsave(snap, s)
 
     return nothing
 end

@@ -126,8 +126,9 @@ function snapshot(traj_file::AbstractFileFormat, index::Integer, template::Abstr
 
     s = similar(template)
     DataTypes.import_dynamic!(s, traj_file; step=step)
-    latest_react = latest_reaction_step(traj_file, step)
-    DataTypes.import_static!(s, traj_file, step=latest_react)
+    if step == latest_reaction_step(traj_file, step)
+        DataTypes.import_static!(s, traj_file, step=step)
+    end
 
     return s
 end

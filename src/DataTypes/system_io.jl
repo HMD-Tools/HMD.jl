@@ -78,7 +78,11 @@ function get_file(file_handler::H5system)
     return file_handler.file
 end
 
-function hmdsave(file_handler::H5system, s::System{D, F, SysType, L}; compress=false) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
+function hmdsave(
+    file_handler::H5system,
+    s::System{D, F, SysType, L};
+    compress = false
+) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     if compress
         @warn "warning: compression is not supported yet. ignoring..."
     end
