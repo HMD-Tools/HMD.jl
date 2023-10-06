@@ -275,7 +275,13 @@ function add_snapshot!(
     return nothing
 end
 
-function import_dynamic!(reader::System{D, F, S, L}, traj_file::H5traj; index::Int64=typemin(Int64), step::Int64=typemin(Int64)) where {D, F<:AbstractFloat, S<:AbstractSystemType, L}
+function import_dynamic!(
+    reader::System{D, F, S, L},
+    traj_file::H5traj;
+    index::Int64=typemin(Int64),
+    step::Int64=typemin(Int64),
+    unsafe = false
+) where {D, F<:AbstractFloat, S<:AbstractSystemType, L}
     if index != typemin(Int64) && step == typemin(Int64)
         step = get_timesteps(traj_file)[index]
     elseif index == typemin(Int64) && step != typemin(Int64)
@@ -286,17 +292,25 @@ function import_dynamic!(reader::System{D, F, S, L}, traj_file::H5traj; index::I
 
     file = get_file(traj_file)
     snap = H5system(file["snapshots/$step"])
-    D_file, F_file, SysType_file = get_metadata(snap)
-    if (D, F) != (D_file, F_file)
-        println("(D, F) != (D_file, F_file): ($D, $F) != ($D_file, $F_file)")
-        error("Dimension and precision of the reader and the trajectory file are different. ")
+    if !unsafe
+        D_file, F_file, SysType_file = get_metadata(snap)
+        if (D, F) != (D_file, F_file)
+            println("(D, F) != (D_file, F_file): ($D, $F) != ($D_file, $F_file)")
+            error("Dimension and precision of the reader and the trajectory file are different. ")
+        end
     end
     import_dynamic!(reader, snap)
 
     return nothing
 end
 
-function import_static!(reader::System{D, F, S, L}, traj_file::H5traj; index::Int64=typemin(Int64), step::Int64=typemin(Int64)) where {D, F<:AbstractFloat, S<:AbstractSystemType, L}
+function import_static!(
+    reader::System{D, F, S, L},
+    traj_file::H5traj;
+    index::Int64=typemin(Int64),
+    step::Int64=typemin(Int64),
+    unsafe = false
+) where {D, F<:AbstractFloat, S<:AbstractSystemType, L}
     if index != typemin(Int64) && step == typemin(Int64)
         step = get_timesteps(traj_file)[index]
     elseif index == typemin(Int64) && step != typemin(Int64)
@@ -307,10 +321,12 @@ function import_static!(reader::System{D, F, S, L}, traj_file::H5traj; index::In
 
     file = get_file(traj_file)
     snap = H5system(file["snapshots/$step"])
-    D_file, F_file, SysType_file = get_metadata(snap)
-    if (D, F) != (D_file, F_file)
-        println("(D, F) != (D_file, F_file): ($D, $F) != ($D_file, $F_file)")
-        error("Dimension and precision of the reader and the trajectory file are different. ")
+    if !unsafe
+        D_file, F_file, SysType_file = get_metadata(snap)
+        if (D, F) != (D_file, F_file)
+            println("(D, F) != (D_file, F_file): ($D, $F) != ($D_file, $F_file)")
+            error("Dimension and precision of the reader and the trajectory file are different. ")
+        end
     end
     import_static!(reader, snap)
 

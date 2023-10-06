@@ -116,7 +116,12 @@ function read_traj(name::AbstractString, template::AbstractTrajectory{D, F, SysT
     reaction_points = get_reactions(traj_file)
     for (step, index) in zip(timesteps, 1:nsnap)
         print("progress: $(100*index÷nsnap)%    \r")
-        s = snapshot(traj_file, index, similar_system(template))
+        s = snapshot(
+            traj_file,
+            similar_system(template);
+            step = step,
+            unsafe = true
+        )
         add!(traj, s, step; reaction=(step ∈ reaction_points))
     end
     println()
@@ -124,17 +129,34 @@ function read_traj(name::AbstractString, template::AbstractTrajectory{D, F, SysT
     return traj
 end
 
-function snapshot(traj_file::AbstractFileFormat, index::Integer, template::AbstractSystem{D, F, SysType}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
-    D_file, F_file, SysType_file = get_metadata(traj_file)
-    if (D_file, F_file) != (D, F)
-        error("Trajectory file $(name) is not compatible with the template $(template).")
+function snapshot(
+    traj_file::AbstractFileFormat,
+    template::AbstractSystem{D, F, SysType};
+    index::Integer = typemin(Int64),
+    step::Integer = typemin(Int64),
+    unsafe::Bool = false
+) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
+    # check metadata
+    if !unsafe
+        D_file, F_file, SysType_file = get_metadata(traj_file)
+        if (D_file, F_file) != (D, F)
+            error("Trajectory file $(name) is not compatible with the template $(template).")
+        end
     end
-    step = get_timesteps(traj_file)[index]
+
+    # get timestep from index
+    step = if step == typemin(Int64) && index != typemin(Int64)
+        get_timesteps(traj_file)[index]
+    elseif step != typemin(Int64) && index == typemin(Int64)
+        step
+    else
+        error("Either index or step must be specified. ")
+    end
 
     s = similar(template)
-    DataTypes.import_dynamic!(s, traj_file; step=step)
+    DataTypes.import_dynamic!(s, traj_file; step=step, unsafe = unsafe)
     if step == latest_reaction_step(traj_file, step)
-        DataTypes.import_static!(s, traj_file, step=step)
+        DataTypes.import_static!(s, traj_file, step=step, unsafe = unsafe)
     end
 
     return s
