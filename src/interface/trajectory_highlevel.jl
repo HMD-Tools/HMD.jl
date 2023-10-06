@@ -84,12 +84,16 @@ end
 #####
 
 function hmdsave(name::AbstractString, traj::AbstractTrajectory{D, F, SysType}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
+    nsnap = length(traj)
     file_handler = h5traj(name, "w")
     index = 1
-    for reader in traj
+    for (i, reader) in enumerate(traj)
+        print("progress: $(100*i÷nsnap)%    \r")
         add_snapshot!(file_handler, reader.reader, reader.step; reaction=is_reaction(traj, index), unsafe=true)
         index += 1
     end
+    println()
+
     close(file_handler)
 end
 
@@ -100,6 +104,7 @@ end
 
 function read_traj(name::AbstractString, template::AbstractTrajectory{D, F, SysType}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
     traj_file = h5traj(name, "r")
+    nsnap = length(traj_file)
 
     D_file, F_file, SysType_file = get_metadata(traj_file)
     if (D_file, F_file, SysType_file) != (D, F, string(SysType))
@@ -109,10 +114,12 @@ function read_traj(name::AbstractString, template::AbstractTrajectory{D, F, SysT
     traj = similar(template)
     timesteps = get_timesteps(traj_file)
     reaction_points = get_reactions(traj_file)
-    for (step, index) in zip(timesteps, 1:length(traj_file))
+    for (step, index) in zip(timesteps, 1:nsnap)
+        print("progress: $(100*index÷nsnap)%    \r")
         s = snapshot(traj_file, index, similar_system(template))
         add!(traj, s, step; reaction=(step ∈ reaction_points))
     end
+    println()
 
     return traj
 end
