@@ -390,7 +390,6 @@ function _merge_hierarchy!(
         end
         SVector{length(exception), Int64}(exception)
     end
-    println("exception: $exception")
     @assert allunique(exception)
 
     # addend node id => augend node id
@@ -404,7 +403,6 @@ function _merge_hierarchy!(
         end
         node_mapping[id] = id + forward_shift - back_shift
     end
-    println("node_mapping: $node_mapping")
 
     # augendに既に存在するラベル数を記録
     # augendになくaddendにあるラベルのcounterは0
@@ -420,7 +418,6 @@ function _merge_hierarchy!(
             counter[type(label)] = 0
         end
     end
-    println("counter: $counter")
 
     # merge vertices and labels
     g_augend, g_addend = _hierarchy(augend), _hierarchy(addend)
@@ -438,7 +435,6 @@ function _merge_hierarchy!(
     addend_part_top = [node_mapping[id] for id in _sub_id(addend, addend_parent)]
     augend_parent_id = _get_nodeid(augend, augend_parent)
     for id in addend_part_top
-        println("super: $augend_parent_id, sub: $id")
         add_edge!(
             g_augend,
             id, # sub
@@ -455,9 +451,6 @@ function _merge_hierarchy!(
     end
 
     if !unsafe
-        println()
-        println(augend)
-        println()
         _label_unique(augend) || error("label is not unique. ")
         _label_nocycle(augend) || error("label hierarchy has cycle. ")
         _label_connected(augend) || error("isolated label found. ")

@@ -224,7 +224,7 @@ function test()
         @test _label_unique(lh)
         lh
     end
-    oracle12 = let
+    oracle11 = let
         # oracle for
         #   _merge_hierarchy!(
         #       tl,
@@ -234,13 +234,31 @@ function test()
         #   )
         lh = deepcopy(lh1)
         # HLabel("lh1", 1) in lh2 is removed, then label ids in lh2 are shifted: 2:5 -> 1:4
-        @test _add_labels!(lh, [HLabel("lh1", i) for i in (2-1):(5-1)]) == Success
+        @test _add_labels!(lh, [HLabel("lh1", i) for i in 7:10]) == Success
         # under ("l1", 1)
-        @test _add_relation!(lh; super=HLabel("lh1", 1), sub=HLabel("lh1", 2-1)) == Success
-        @test _add_relation!(lh; super=HLabel("lh1", 1), sub=HLabel("lh1", 3-1)) == Success
+        @test _add_relation!(lh; super=HLabel("lh1", 1), sub=HLabel("lh1", 7)) == Success
+        @test _add_relation!(lh; super=HLabel("lh1", 1), sub=HLabel("lh1", 8)) == Success
         # under ("lh1", 2), ("lh1", 3)
-        @test _add_relation!(lh; super=HLabel("lh1", 2-1), sub=HLabel("lh1", 4-1)) == Success
-        @test _add_relation!(lh; super=HLabel("lh1", 3-1), sub=HLabel("lh1", 5-1)) == Success
+        @test _add_relation!(lh; super=HLabel("lh1", 7), sub=HLabel("lh1", 9)) == Success
+        @test _add_relation!(lh; super=HLabel("lh1", 8), sub=HLabel("lh1", 10)) == Success
+        @test _label_connected(lh)
+        @test _label_nocycle(lh)
+        @test _label_unique(lh)
+        lh
+    end
+    oracle12 = let
+        # oracle for
+        #   _merge_hierarchy!(
+        #       tl,
+        #       lh13;
+        #       augend_parent = HLabel("lh1", 3),
+        #       addend_parent = HLabel("lh1", 3)
+        #   )
+        lh = deepcopy(lh1)
+        @test _add_labels!(lh, [HLabel("lh1", i) for i in 7:8]) == Success
+        # under ("l1", 3)
+        @test _add_relation!(lh; super=HLabel("lh1", 3), sub=HLabel("lh1", 7)) == Success
+        @test _add_relation!(lh; super=HLabel("lh1", 3), sub=HLabel("lh1", 8)) == Success
         @test _label_connected(lh)
         @test _label_nocycle(lh)
         @test _label_unique(lh)
@@ -265,8 +283,23 @@ function test()
     )
     @test tl == oracle2
 
+    tl = deepcopy(lh1)
+    _merge_hierarchy!(
+        tl,
+        lh12;
+        augend_parent = HLabel("lh1", 1),
+        addend_parent = HLabel("lh1", 1)
+    )
+    @test tl == oracle11
 
-
+    tl = deepcopy(lh1)
+    _merge_hierarchy!(
+        tl,
+        lh13;
+        augend_parent = HLabel("lh1", 3),
+        addend_parent = HLabel("lh1", 3)
+    )
+    @test tl == oracle12
 
 end #testset
 
