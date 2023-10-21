@@ -3,13 +3,15 @@ module HierarchyLabels
 using Graphs
 using MLStyle
 using Reexport
+using StaticArrays
 
-@reexport import Base: getindex, ==, ∈, ∋, ∉, show
+@reexport import Base: getindex, ==, ∈, ∋, ∉, show, println
 @reexport import ..HMD: serialize, deserialize
 
 export HLabel, id, type
 export LabelResult, Label_Missing, Label_Occupied, Label_Duplication, Relation_Missing, Relation_Occupied, Success
 export  LabelHierarchy, _labels, _add_label!, _add_labels!, _add_relation!, _remove_label!, _remove_relation!
+export _label_unique, _label_nocycle, _label_connected
 export _label2node, _contains, ∈, ∋, ∉, _has_relation ,_get_nodeid, getindex
 export _issuper, _issub, _super_id, _sub_id, _super, _sub
 export _root, _depth, _merge_hierarchy!
@@ -38,6 +40,7 @@ end
     Label_Duplication
     Relation_Missing
     Relation_Occupied
+    Cycle_Found
     Success
 end
 
@@ -94,6 +97,30 @@ function Base.show(io::IO, ::MIME"text/plain", lh::LabelHierarchy)
     subtree(lh, _root(lh), 1, 4)
 end
 
+function Base.println(lh::LabelHierarchy)
+    subtree(lh, label, level, indent) = begin
+        label == _root(lh) && println("$label")
+        labels = _sub(lh, label)
+        nlines = length(labels)
+        for (i, s) in enumerate(labels)
+            bc = if _has_relation(lh, label, s)
+                i == length(labels) ? "└" : "├"
+            else
+                " "
+            end
+            str = join(fill(" ", level * indent)) * bc * "$s\n"
+            if degree(_hierarchy(lh), _get_nodeid(lh, s)) == 0
+                printstyled(str; color=:red)
+            else
+                print(str)
+            end
+            subtree(lh, s, level + 1, indent)
+        end
+        #nlines
+    end
+    subtree(lh, _root(lh), 1, 4)
+end
+
 function _hierarchy(lh::LabelHierarchy)
     return lh.g
 end
@@ -139,11 +166,14 @@ function _add_label!(lh::LabelHierarchy, label::HLabel)
     end
 
     @assert add_vertex!(g)
+    if is_cyclic(g)
+        rem_vertex!(g, nv(g))
+        return Cycle_Found
+    end
+
     current_id = nv(g)
     push!(_labels(lh), label)
     merge!(_label2node(lh), Dict(label => current_id))
-
-    @assert !is_cyclic(g)
 
     return Success
 end
@@ -156,25 +186,28 @@ function _add_labels!(lh::LabelHierarchy, labels::AbstractVector{HLabel})
     append!(lh.labels, labels)
     merge!(_label2node(lh), Dict(label => node_id for (label, node_id) in zip(labels, new_range)))
 
-    return Success
+    if length(_label2node(lh)) != nv(g)
+        return Label_Occupied
+    else
+        return Success
+    end
 end
 
 function _add_relation!(lh::LabelHierarchy; super::HLabel, sub::HLabel, unsafe::Bool=false)
-    if !unsafe
-        if !_contains(lh, super) || !_contains(lh, sub)
-            return Label_Missing
-        elseif super == sub
-            return Label_Duplication
-        elseif _has_relation(lh, super, sub)
-            return Relation_Occupied
-        end
+    if !_contains(lh, super) || !_contains(lh, sub)
+        return Label_Missing
+    elseif super == sub
+        return Label_Duplication
+    elseif _has_relation(lh, super, sub)
+        return Relation_Occupied
     end
 
     g, super_id, sub_id = _hierarchy(lh), _get_nodeid(lh, super), _get_nodeid(lh, sub)
     @assert add_edge!(g, sub_id, super_id)
 
-    if !unsafe
-        @assert !is_cyclic(g)
+    if !unsafe && is_cyclic(g)
+        rem_edge!(g, sub_id, super_id)
+        return Cycle_Found
     end
 
     return Success
@@ -182,23 +215,23 @@ end
 
 function _remove_label!(lh::LabelHierarchy, label::HLabel)
     if !_contains(lh, label)
-        #error("LabelHierarchy does not contain $label. ")
         return Label_Missing
     end
     g, id = _hierarchy(lh), _get_nodeid(lh, label)
 
+    # when removing the ith node, the last node (== nv(g)) moves to the ith node
     @assert rem_vertex!(g, id)
-    # 消去したnode idがiのとき，node idの末尾(==nv(g))がiに変化する
     end_label = pop!(_labels(lh))
     delete!(_label2node(lh), label)
-    _set_label!(lh, end_label, id)
+    if id != nv(g)
+        _set_label!(lh, end_label, id)
+    end
 
     return Success
 end
 
 function _remove_relation!(lh::LabelHierarchy, label1::HLabel, label2::HLabel)
     if !_contains(lh, label1) || !_contains(lh, label2)
-        #error("LabelHierarchy does not contain $label1 or $label2. ")
         return Relation_Missing
     end
 
@@ -209,6 +242,19 @@ function _remove_relation!(lh::LabelHierarchy, label1::HLabel, label2::HLabel)
     @assert rem_edge!(g, n1, n2) || rem_edge!(g, n2, n1)
 
     return Success
+end
+
+function _label_unique(lh::LabelHierarchy)
+    @assert _label2node(lh) |> values |> allunique
+    return allunique(_labels(lh))
+end
+
+function _label_nocycle(lh::LabelHierarchy)
+    return !is_cyclic(_hierarchy(lh))
+end
+
+function _label_connected(lh::LabelHierarchy)
+    return is_connected(_hierarchy(lh))
 end
 
 function _contains(lh::LabelHierarchy, label::HLabel)
@@ -297,7 +343,7 @@ function _root_id(lh::LabelHierarchy)
     g = _hierarchy(lh)
     root_id = filter(i -> isempty(_super_id(lh, i)), 1:nv(g))
 
-    @assert length(root_id) == 1
+    #@assert length(root_id) == 1
     return root_id[1]
 end
 
@@ -319,9 +365,34 @@ function _depth(lh::LabelHierarchy)
     return depth - 1
 end
 
-function _merge_hierarchy!(augend::LabelHierarchy, addend::LabelHierarchy; augend_parent::HLabel, addend_parent::HLabel, unsafe::Bool=false)
+function _merge_hierarchy!(
+    augend::LabelHierarchy,
+    addend::LabelHierarchy;
+    augend_parent::HLabel,
+    addend_parent::HLabel,
+    unsafe::Bool = false
+)
     # addend_parent自身とその上位ノードはマージから除外する
-    exception = Tuple((_get_nodeid(addend, addend_parent), _super_id(addend, addend_parent)...))
+    exception = let
+        addend_parent_id = _get_nodeid(addend, addend_parent)
+        # depth first search from addend root
+        # skips sub branch of addend_parent
+        buffer = [_root_id(addend)]
+        exception = Int64[]
+        while !isempty(buffer)
+            id = popfirst!(buffer)
+            pushfirst!(exception, id)
+            if id == addend_parent_id
+                continue
+            else
+                prepend!(buffer, _sub_id(addend, id))
+            end
+        end
+        SVector{length(exception), Int64}(exception)
+    end
+    println("exception: $exception")
+    @assert allunique(exception)
+
     # addend node id => augend node id
     node_mapping = Dict{Int64, Int64}()
     forward_shift = nv(_hierarchy(augend))
@@ -333,6 +404,7 @@ function _merge_hierarchy!(augend::LabelHierarchy, addend::LabelHierarchy; augen
         end
         node_mapping[id] = id + forward_shift - back_shift
     end
+    println("node_mapping: $node_mapping")
 
     # augendに既に存在するラベル数を記録
     # augendになくaddendにあるラベルのcounterは0
@@ -348,6 +420,7 @@ function _merge_hierarchy!(augend::LabelHierarchy, addend::LabelHierarchy; augen
             counter[type(label)] = 0
         end
     end
+    println("counter: $counter")
 
     # merge vertices and labels
     g_augend, g_addend = _hierarchy(augend), _hierarchy(addend)
@@ -360,6 +433,18 @@ function _merge_hierarchy!(augend::LabelHierarchy, addend::LabelHierarchy; augen
             add_edge!(g_augend, node_mapping[src(edge)], node_mapping[dst(edge)])
         end
     end
+    # connect top of addend hierarchy and augend_parent
+    # number of addend part top may be >= 2
+    addend_part_top = [node_mapping[id] for id in _sub_id(addend, addend_parent)]
+    augend_parent_id = _get_nodeid(augend, augend_parent)
+    for id in addend_part_top
+        println("super: $augend_parent_id, sub: $id")
+        add_edge!(
+            g_augend,
+            id, # sub
+            augend_parent_id # super
+        )
+    end
 
     # label
     for (old_id, new_id) in sort(collect(pairs(node_mapping)), by=x->x[2])
@@ -369,11 +454,13 @@ function _merge_hierarchy!(augend::LabelHierarchy, addend::LabelHierarchy; augen
         push!(_label2node(augend), HLabel(ltype, counter[ltype]) => new_id)
     end
 
-    # connecting graphs
-    for old_label in _sub(addend, addend_parent)
-        old_id = _get_nodeid(addend, old_label)
-        new_label = _get_label(augend, node_mapping[old_id])
-        _add_relation!(augend; super=augend_parent, sub=new_label, unsafe=unsafe)
+    if !unsafe
+        println()
+        println(augend)
+        println()
+        _label_unique(augend) || error("label is not unique. ")
+        _label_nocycle(augend) || error("label hierarchy has cycle. ")
+        _label_connected(augend) || error("isolated label found. ")
     end
 
     return nothing
@@ -396,7 +483,7 @@ function serialize(lh::LabelHierarchy)
 
     g = _hierarchy(lh)
     num_node = nv(g)
-    edges_org, edges_dst = begin
+    edges_org, edges_dst = let
         orig, dest = Vector{Int64}(undef, ne(g)), Vector{Int64}(undef, ne(g))
         for (i, edge) in enumerate(edges(g))
             orig[i], dest[i] = src(edge), dst(edge)

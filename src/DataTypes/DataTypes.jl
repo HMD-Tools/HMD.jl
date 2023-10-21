@@ -24,7 +24,7 @@ using ..HierarchyLabels
 
 @reexport import Base: *, +, -, /, <, <=, ==, >, >=, close, contains, convert, getindex,firstindex, lastindex, iterate,
     length, position, precision, promote_rule, promote_type, setproperty!, show, similar,
-    string, time, ∈, ∉, merge!
+    string, time, ∈, ∉, merge!, println
 
 @reexport import ..HMD: deserialize, serialize
 @reexport import ..HMD:
