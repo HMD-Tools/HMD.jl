@@ -192,7 +192,7 @@ function _traverse_from(s::AbstractSystem, hname::AbstractString, label::HLabel,
     return labels
 end
 
-function hierarchy_leaf_isatom(s::AbstracySystem)
+function hierarchy_leaf_isatom(s::AbstractSystem)
     for hname in hierarchy_names(s)
         for label in all_labels(s, hname)
             if !is_atom(label) && isempty(sub(s, hname, label))
