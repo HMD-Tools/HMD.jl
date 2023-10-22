@@ -148,6 +148,7 @@ export
     l2a,
     super_labels,
     sub_labels,
+    hierarchy_leaf_isatom,
     hmdsave,
     read_system,
 

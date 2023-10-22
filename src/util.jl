@@ -68,3 +68,35 @@ function deserialize(chars::Vector{UInt8}, bounds::Vector{Int64})
         String(chars[bounds[i]:bounds[i+1]-1])
     end
 end
+
+function <(rhs::Type{T1}, lhs::Type{T2}) where {T1<:AbstractFloat, T2<:AbstractFloat}
+    if lhs == BigFloat
+        return true
+    elseif lhs == Float64 && rhs ∈ (Float16, Float32)
+        return true
+    elseif lhs == Float32 && rhs == Float16
+        return true
+    else
+        return false
+    end
+end
+
+function <=(rhs::Type{T1}, lhs::Type{T2}) where {T1<:AbstractFloat, T2<:AbstractFloat}
+    if rhs == lhs
+        return true
+    else
+        return rhs < lhs
+    end
+end
+
+function >=(rhs::Type{T1}, lhs::Type{T2}) where {T1<:AbstractFloat, T2<:AbstractFloat}
+    return !(rhs < lhs)
+end
+
+function >(rhs::Type{T1}, lhs::Type{T2}) where {T1<:AbstractFloat, T2<:AbstractFloat}
+    if lhs == rhs
+        return false
+    else
+        return !(rhs < lhs)
+    end
+end

@@ -2,17 +2,17 @@
 ##### HDF5 IO
 #####
 
-function serialize(vec::Vector{SVector{D, T}}) where {D, T<:Real}
+function serialize(vec::Vector{SVector{D, T}}, Tconvert=T) where {D, T<:Real}
     #return [vec[atom_id][dim] for dim in 1:D, atom_id in eachindex(vec)]
-    spos = Matrix{T}(undef, D, length(vec))
+    spos = Matrix{Tconvert}(undef, D, length(vec))
     for atom_id in eachindex(vec)
         spos[:, atom_id] = vec[atom_id]
     end
     return spos
 end
 
-function deserialize(D::Integer, mat::Matrix{T}) where {T<:Real}
-    pos = SVector{D, T}[]
+function deserialize(D::Integer, mat::Matrix{T}, Tconvert=T) where {T<:Real}
+    pos = SVector{D, Tconvert}[]
     resize!(pos, size(mat, 2))
     for atom_id in eachindex(pos)
         pos[atom_id] = mat[:, atom_id]
@@ -80,8 +80,9 @@ end
 
 function hmdsave(
     file_handler::H5system,
-    s::System{D, F, SysType, L};
-    compress = false
+    s::System{D, F, SysType, L},
+    precision = F;
+    compress = false,
 ) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     if compress
         @warn "warning: compression is not supported yet. ignoring..."
@@ -92,21 +93,18 @@ function hmdsave(
     # metadata
     file["infotype"] = "System"
     file["dimension"] = dimension(s)
-    file["precision"] = precision(s) |> string
+    file["precision"] = precision |> string
     file["system_type"] = system_type(s) |> string
 
     #data
     file["time"] = time(s)
-    file["position"] = serialize(all_positions(s))
+    file["position"] = serialize(all_positions(s), precision)
     file["travel"] = serialize(all_travels(s))
     file["wrapped"] = wrapped(s)
 
     file["box/origin"] = Vector(box(s).origin)
     file["box/axis"] = Matrix(box(s).axis)
 
-    #chars, bounds = serialize(all_elements(s))
-    #file["element/chars"]  = chars
-    #file["element/bounds"] = bounds
     file["element"] = all_elements(s)
 
     # topology
@@ -136,9 +134,12 @@ end
 function read_system(system_file::H5system, template::System{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     # metadata check
     D_file, F_file, SysType_file = get_metadata(system_file)
-    if (D_file, F_file) != (D, F)
+    if D_file != D
         close(system_file)
-        error("System type mismatch. (file: $(D_file), $(F_file), $(SysType_file), system: $(D), $(F), $(SysType)")
+        error("System type mismatch. (file: $(D_file), $(SysType_file), system: $(D), $(SysType)")
+    elseif F_file > F
+        @info "warning: system precision $(F) is lower than the file precision $(F_file). \n" *
+            "This cause information loss."
     end
 
     # data
@@ -148,11 +149,14 @@ function read_system(system_file::H5system, template::System{D, F, SysType, L}) 
     return s
 end
 
-function import_dynamic!(s::System{D, F, SysType, L}, system_file::H5system) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
+function import_dynamic!(
+    s::System{D, F, SysType, L},
+    system_file::H5system
+) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     file = get_file(system_file)
     set_time!(s, read(file, "time"))
     set_box!(s, BoundingBox{D, F}(read(file, "box/origin"), read(file, "box/axis")))
-    s.position = deserialize(D, read(file, "position"))
+    s.position = deserialize(D, read(file, "position"), F)
     s.travel = deserialize(D, read(file, "travel"))
     s.wrapped = read(file, "wrapped")
 

@@ -83,13 +83,31 @@ end
 ##### Trajectory HDF5 interface
 #####
 
-function hmdsave(name::AbstractString, traj::AbstractTrajectory{D, F, SysType}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
+function hmdsave(
+    name::AbstractString,
+    traj::AbstractTrajectory{D, F, SysType};
+    precision = F
+) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
+    if precision < F && precision != Float16
+        @info "warning: saving precision is lower than the system precision. \n" *
+            "This cause information loss."
+    elseif precision == Float16
+        @warn "For molecular dynamics, Float16 is not appropriate in most cases. \n"
+    end
+
     nsnap = length(traj)
     file_handler = h5traj(name, "w")
     index = 1
     for (i, reader) in enumerate(traj)
         print("progress: $(100*i÷nsnap)%    \r")
-        add_snapshot!(file_handler, reader.reader, reader.step; reaction=is_reaction(traj, index), unsafe=true)
+        add_snapshot!(
+            file_handler,
+            reader.reader,
+            reader.step,
+            precision;
+            reaction = is_reaction(traj, index),
+            unsafe = true,
+        )
         index += 1
     end
     println()

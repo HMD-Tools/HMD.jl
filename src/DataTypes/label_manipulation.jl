@@ -125,6 +125,39 @@ function remove_relation!(s::System, hname::AbstractString; super::HLabel, sub::
     return nothing
 end
 
+function label_unique(s::System)
+    for hname in hierarchy_names(s)
+        lh = hierarchy(s, hname)
+        if !_label_unique(lh)
+            error("label is not unique in hierarchy $(hname). ")
+        end
+    end
+
+    return true
+end
+
+function label_nocycle(s::System)
+    for hname in hierarchy_names(s)
+        lh = hierarchy(s, hname)
+        if !_label_nocycle(lh)
+            error("label has cycle in hierarchy $(hname). ")
+        end
+    end
+
+    return true
+end
+
+function label_connected(s::System)
+    for hname in hierarchy_names(s)
+        lh = hierarchy(s, hname)
+        if !_label_connected(lh)
+            error("isolated label found in hierarchy $(hname). ")
+        end
+    end
+
+    return true
+end
+
 function contains(s::System, hname::AbstractString, label::HLabel)
     lh = hierarchy(s, hname)
     return _contains(lh, label)

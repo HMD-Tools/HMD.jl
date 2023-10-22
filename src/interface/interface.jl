@@ -74,6 +74,9 @@ insert_relation!(s::AbstractSystem, hname::AbstractString, label::HLabel; super:
 insert_relations!(s::AbstractSystem, hname::AbstractString, index::Integer; super::AbstractVector{HLabel}, sub::AbstractVector{HLabel}) = _NI("insert_relations!")
 remove_label!(s::AbstractSystem, hname::AbstractString, label::HLabel) = _NI("remove_label!")
 remove_relation!(s::AbstractSystem, hname::AbstractString, super::HLabel, sub::HLabel) = _NI("remove_relation!")
+label_unique(s::AbstractSystem) = _NI("label_unique")
+label_nocycle(s::AbstractSystem) = _NI("label_nocycle")
+label_connected(s::AbstractSystem) = _NI("label_connected")
 contains(s::AbstractSystem, hname::AbstractString, label::HLabel) = _NI("contains")
 issuper(s::AbstractSystem, hname::AbstractString, label1::HLabel, label2::HLabel) = _NI("issuper")
 issub(s::AbstractSystem, hname::AbstractString, label1::HLabel, label2::HLabel) = _NI("issub")
@@ -115,8 +118,21 @@ unwrap!(traj::AbstractTrajectory) = _NI("unwrap!")
 prop(s::AbstractSystem, index::Integer, pname::AbstractString) = NI("prop")
 
 # trajectory io interface
-add_snapshot!(file_handler::AbstractFileFormat, s::AbstractSystem, step::Int64; reaction::Bool=false, unsafe::Bool=false) = _NI("add_snapshot!")
-import_dynamic!(reader::AbstractSystem, traj_file::AbstractFileFormat; index::Int64=typemin(Int64), step::Int64=typemin(Int64)) = _NI("import_dynamic!")
+add_snapshot!(
+    file_handler::AbstractFileFormat,
+    s::AbstractSystem{D, F},
+    step::Int64,
+    precision::Type{<:AbstractFloat} = F;
+    reaction::Bool = false,
+    unsafe::Bool = false
+) where {D, F<:AbstractFloat} = _NI("add_snapshot!")
+import_dynamic!(
+    reader::AbstractSystem{D, F},
+    traj_file::AbstractFileFormat,
+    precision::Type{<:AbstractFloat} = F;
+    index::Int64 = typemin(Int64),
+    step::Int64 = typemin(Int64)
+) where {D, F<:AbstractFloat} = _NI("import_dynamic!")
 import_static!(reader::AbstractSystem, traj_file::AbstractFileFormat; index::Int64=typemin(Int64), step::Int64=typemin(Int64)) = _NI("import_dynamic!")
 latest_reaction_step(traj_file::AbstractFileFormat, current_step::Integer) = _NI("latest_reaction_step")
 get_timesteps(traj_file::AbstractFileFormat) = _NI("get_timesteps")

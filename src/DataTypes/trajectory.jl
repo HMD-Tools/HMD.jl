@@ -237,17 +237,22 @@ end
 function add_snapshot!(
     file_handler::H5traj,
     s::System{D, F, SysType, L},
-    step::Int64;
+    step::Int64,
+    precision::Type{<:AbstractFloat} = F;
     reaction::Bool = false,
-    unsafe::Bool = false
+    unsafe::Bool = false,
 ) where{D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     file = get_file(file_handler)
+    if haskey(file, "snapshots/$step")
+        close(file)
+        error("snapshot at $step already exists. ")
+    end
 
     # construction
     if keys(file) |> isempty
         file["infotype"] = "Trajectory"
         file["dimension"] = dimension(s)
-        file["precision"] = precision(s) |> string
+        file["precision"] = string(precision) #precision(s) |> string
         file["system_type"] = system_type(s) |> string
         file["wrapped"] = wrapped(s)
         create_group(file, "snapshots")
@@ -264,11 +269,12 @@ function add_snapshot!(
             error("system's topology, hierarychy and elements are empty. ")
         end
         create_group(file, "reactions/$step")
-        hmdsave(snap, s)
+        hmdsave(snap, s, precision)
     else
         hmdsave(
             snap,
-            similar(s, reserve_dynamic=true, reserve_static=false)
+            similar(s, reserve_dynamic=true, reserve_static=false),
+            precision
         )
     end
 
