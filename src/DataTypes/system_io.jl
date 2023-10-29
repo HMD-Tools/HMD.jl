@@ -12,12 +12,12 @@ function serialize(vec::Vector{SVector{D, T}}, Tconvert=T) where {D, T<:Real}
 end
 
 function deserialize(D::Integer, mat::Matrix{T}, Tconvert=T) where {T<:Real}
-    pos = SVector{D, Tconvert}[]
-    resize!(pos, size(mat, 2))
+    pos = Vector{SVector{D, Tconvert}}(undef, size(mat, 2))
+    #resize!(pos, size(mat, 2))
     for atom_id in eachindex(pos)
         pos[atom_id] = mat[:, atom_id]
     end
-    return pos
+    return pos::Vector{SVector{D, Tconvert}}
 end
 
 struct SerializedTopology
@@ -156,8 +156,14 @@ function import_dynamic!(
     file = get_file(system_file)
     set_time!(s, read(file, "time"))
     set_box!(s, BoundingBox{D, F}(read(file, "box/origin"), read(file, "box/axis")))
-    s.position = deserialize(D, read(file, "position"), F)
-    s.travel = deserialize(D, read(file, "travel"))
+    s.position = let
+        mat = read(file, "position")
+        reinterpret(SVector{D, F}, reshape(mat, length(mat)))
+    end
+    s.travel = let
+        mat = read(file, "travel")
+        reinterpret(SVector{D, Int16}, reshape(mat, length(mat)))
+    end
     s.wrapped = read(file, "wrapped")
 
     for pname in read(file, "property_names")
