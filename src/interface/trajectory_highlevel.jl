@@ -19,7 +19,7 @@ function getindex(traj::AbstractTrajectory{D, F, SysType}, index::Integer) where
 
     # set properties that changes at every step
     current = get_system(traj, index)
-    set_time!(replica, time(replica))
+    set_time!(replica, time(current))
     set_box!(replica, deepcopy(box(current)))
     replica.position = all_positions(current) |> deepcopy
     replica.travel = deepcopy(current.travel)
@@ -51,17 +51,22 @@ function Base.iterate(traj::AbstractTrajectory{D, F, SysType}) where {D, F<:Abst
     DataTypes.import_dynamic!(reader, traj, index)
     DataTypes.import_static!(reader, traj, index)
 
-    return (step=get_timestep(traj, index), reader=reader), index+1
+    return (step=get_timestep(traj, index), reader=reader), (index+1, reader)
 end
 
-function Base.iterate(traj::AbstractTrajectory{D, F, SysType}, state::Int64) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
-    index = state
+function Base.iterate(
+    traj::AbstractTrajectory{D, F, SysType},
+    state::Tuple{Int64, S}
+    #state::Int64
+) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, S<:AbstractSystem{D, F, SysType}}
+    index = state[1]
     if index <= length(traj)
-        reader = similar_system(traj)
+        #reader = similar_system(traj)
+        reader = state[2]
         rp = latest_reaction(traj, index)
         DataTypes.import_static!(reader, traj, rp)
         DataTypes.import_dynamic!(reader, traj, index)
-        return (step=get_timestep(traj, index), reader=reader), index+1
+        return (step=get_timestep(traj, index), reader=reader), (index+1, reader)
     else
         return nothing
     end
