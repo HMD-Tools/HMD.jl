@@ -102,8 +102,8 @@ function hmdsave(
     file["travel"] = serialize(all_travels(s))
     file["wrapped"] = wrapped(s)
 
-    file["box/origin"] = Vector(box(s).origin)
-    file["box/axis"] = Matrix(box(s).axis)
+    file["box/origin"] = Vector{F}(box(s).origin)
+    file["box/axis"] = Matrix{F}(box(s).axis)
 
     file["element"] = all_elements(s)
 

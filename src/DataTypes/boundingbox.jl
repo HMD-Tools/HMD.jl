@@ -7,7 +7,7 @@ struct BoundingBox{D, F <: AbstractFloat, L} <: AbstractBbox{D, F, L}
     axis::SMatrix{D, D, F, L}
 end
 
-function BoundingBox{D, F}(origin::AbstractVector{F}, axis::AbstractMatrix{F}) where {D, F<:AbstractFloat}
+function BoundingBox{D, F}(origin::AbstractVector{T}, axis::AbstractMatrix{T}) where {D, F<:AbstractFloat, T<:Real}
     d = det(axis)
     if d < 0
         error("left-handed system not allowed")
