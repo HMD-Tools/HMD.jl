@@ -1,4 +1,4 @@
-export Trajectory
+export Trajectory, SubTrajectory
 export all_timesteps, get_timestep, is_reaction, get_system
 export latest_reaction, latest_reaction_step, add!, update_reader!, add!
 export setproperty!, length
@@ -27,6 +27,15 @@ function Trajectory(s::System{D, F, SysType, L}) where {D, F<:AbstractFloat, Sys
     return Trajectory{D, F, SysType, L}([s], [1], [1])
 end
 
+function Base.show(
+    io::IO, ::MIME"text/plain", traj::Trajectory{D, F, S, L}
+) where {D, F<:AbstractFloat, S<:AbstractSystemType, L}
+    "Trajectory{$D, $F, $S, $L}
+        length: $(length(traj))
+        time: $(time(traj.systems[1])) to $(time(traj.systems[end]))
+    " |> println
+end
+
 function empty_trajectory(s::System{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     return Trajectory{D, F, SysType, L}()
 end
@@ -53,6 +62,31 @@ end
 
 function Base.length(traj::Trajectory{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     return length(traj.systems)
+end
+
+function Base.iterate(traj::Trajectory{D, F, S, L}) where {D, F<:AbstractFloat, S<:AbstractSystemType, L}
+    index = 1
+    reader = similar_system(traj)
+    import_dynamic!(reader, traj, index)
+    import_static!(reader, traj, index)
+
+    return (step=get_timestep(traj, index), snap=reader), (index+1, reader)
+end
+
+function Base.iterate(
+    traj::Trajectory{D, F, SysType, L},
+    state::Tuple{Int64, S}
+) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, S<:AbstractSystem{D, F, SysType}, L}
+    index = state[1]
+    if index <= length(traj)
+        reader = state[2]
+        rp = latest_reaction(traj, index)
+        import_static!(reader, traj, rp)
+        import_dynamic!(reader, traj, index)
+        return (step=get_timestep(traj, index), snap=reader), (index+1, reader)
+    else
+        return nothing
+    end
 end
 
 function add!(traj::Trajectory{D, F, SysType, L}, s::System{D, F, SysType, L}, timestep::Integer; reaction=false) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
@@ -206,6 +240,109 @@ function unwrap!(traj::Trajectory{D, F, SysType, L}) where {D, F<:AbstractFloat,
 
     return nothing
 end
+
+
+
+#####
+##### SubTrajectory types
+#####
+
+struct SubTrajectory{D, F<:AbstractFloat, S<:AbstractSystemType, L, R<:OrdinalRange} <: AbstractTrajectory{D, F, S}
+    traj::Trajectory{D, F, S, L}
+    traj_range::R
+end
+
+function Base.show(
+    io::IO, ::MIME"text/plain", st::SubTrajectory{D, F, S, L, R}
+) where {D, F<:AbstractFloat, S<:AbstractSystemType, L, R<:OrdinalRange}
+    if isempty(st)
+        println("empty SubTrajectory{$D, $F, $S, $L}")
+        return nothing
+    end
+
+    start = st.traj_range[1]
+    final = st.traj_range[end]
+    "SubTrajectory{$D, $F, $S, $L} with range $(st.traj_range)
+        length: $(length(st))
+        time: $(time(st.traj.systems[start])) to $(time(st.traj.systems[final]))
+    " |> println
+
+    return nothing
+end
+
+function Base.getindex(
+    traj::Trajectory{D, F, S, L},
+    traj_range::OrdinalRange{I, I}
+) where {D, F<:AbstractFloat, S<:AbstractSystemType, L, I<:Integer}
+    if !(traj_range ⊆ 1:length(traj))
+        error("traj_range must be a subset of $(1:length(traj)). found: $(traj_range)")
+    end
+
+    return SubTrajectory(traj, traj_range)
+end
+
+function Base.getindex(
+    st::SubTrajectory{D, F, S, L, R},
+    idx::Integer
+) where {D, F<:AbstractFloat, S<:AbstractSystemType, L, R<:OrdinalRange}
+    real_index = st.traj_range[idx]
+    return st.traj[real_index]
+end
+
+function Base.iterate(st::SubTrajectory{D, F, S, L, R}) where {D, F<:AbstractFloat, S<:AbstractSystemType, L, R<:OrdinalRange}
+    isempty(st.traj_range) && return nothing
+
+    pseude_idx = 1
+    real_idx = st.traj_range[pseude_idx]
+    reader = similar_system(st.traj)
+    import_dynamic!(reader, st.traj, real_idx)
+    import_static!(reader, st.traj, real_idx)
+
+    return (step=get_timestep(st.traj, real_idx), snap=reader), (pseude_idx+1, reader)
+end
+
+function Base.iterate(
+    st::SubTrajectory{D, F, SysType, L, R},
+    state::Tuple{Int64, S}
+) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, S<:AbstractSystem{D, F, SysType}, L, R<:OrdinalRange}
+    pseude_idx = state[1]
+    if pseude_idx <= length(st.traj_range)
+        real_idx = st.traj_range[pseude_idx]
+        reader = state[2]
+        rp = latest_reaction(st.traj, real_idx)
+        import_static!(reader, st.traj, rp)
+        import_dynamic!(reader, st.traj, real_idx)
+        return (step=get_timestep(st.traj, real_idx), snap=reader), (pseude_idx+1, reader)
+    else
+        return nothing
+    end
+end
+
+function is_reaction(st::SubTrajectory{D, F, S, L, R}, index::Integer) where {D, F<:AbstractFloat, S<:AbstractSystemType, L, R<:OrdinalRange}
+    return is_reaction(st.traj, st.traj_range[index])
+end
+
+function get_system(st::SubTrajectory{D, F, S, L, R}, index::Integer) where {D, F<:AbstractFloat, S<:AbstractSystemType, L, R<:OrdinalRange}
+    return get_system(st.traj, st.traj_range[index])
+end
+
+function all_timesteps(st::SubTrajectory{D, F, S, L, R}) where {D, F<:AbstractFloat, S<:AbstractSystemType, L, R<:OrdinalRange}
+    return all_timesteps(st.traj)[st.traj_range]
+end
+
+function get_timestep(st::SubTrajectory{D, F, S, L, R}, index::Integer) where {D, F<:AbstractFloat, S<:AbstractSystemType, L, R<:OrdinalRange}
+    return get_timestep(st.traj, st.traj_range[index])
+end
+
+function Base.length(st::SubTrajectory{D, F, S, L, R}) where {D, F<:AbstractFloat, S<:AbstractSystemType, L, R<:OrdinalRange}
+    return length(st.traj_range)
+end
+
+function wrapped(st::SubTrajectory{D, F, S, L, R}) where {D, F<:AbstractFloat, S<:AbstractSystemType, L, R<:OrdinalRange}
+    return wrapped(st.traj)
+end
+
+
 
 #####
 ##### Trajectory HDF5 types

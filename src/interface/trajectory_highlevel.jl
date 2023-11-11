@@ -31,46 +31,32 @@ function getindex(traj::AbstractTrajectory{D, F, SysType}, index::Integer) where
     return replica
 end
 
-function getindex(
-    traj::AbstractTrajectory{D, F, SysType},
-    rng::AbstractUnitRange{I}
-) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, I<:Integer}
-    slice = empty_trajectory(traj[1])
-    for (i, itr) in enumerate(traj)
-        i ∉ rng && continue
-        snap = deepcopy(itr.reader)
-        add!(slice, snap, itr.step; reaction=is_reaction(traj, i))
-    end
+#function Base.iterate(traj::AbstractTrajectory{D, F, SysType}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
+#    index = 1
+#    reader = similar_system(traj)
+#    DataTypes.import_dynamic!(reader, traj, index)
+#    DataTypes.import_static!(reader, traj, index)
+#
+#    return (step=get_timestep(traj, index), snap=reader), (index+1, reader)
+#end
 
-    return slice
-end
-
-function Base.iterate(traj::AbstractTrajectory{D, F, SysType}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
-    index = 1
-    reader = similar_system(traj)
-    DataTypes.import_dynamic!(reader, traj, index)
-    DataTypes.import_static!(reader, traj, index)
-
-    return (step=get_timestep(traj, index), reader=reader), (index+1, reader)
-end
-
-function Base.iterate(
-    traj::AbstractTrajectory{D, F, SysType},
-    state::Tuple{Int64, S}
-    #state::Int64
-) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, S<:AbstractSystem{D, F, SysType}}
-    index = state[1]
-    if index <= length(traj)
-        #reader = similar_system(traj)
-        reader = state[2]
-        rp = latest_reaction(traj, index)
-        DataTypes.import_static!(reader, traj, rp)
-        DataTypes.import_dynamic!(reader, traj, index)
-        return (step=get_timestep(traj, index), reader=reader), (index+1, reader)
-    else
-        return nothing
-    end
-end
+#function Base.iterate(
+#    traj::AbstractTrajectory{D, F, SysType},
+#    state::Tuple{Int64, S}
+#    #state::Int64
+#) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, S<:AbstractSystem{D, F, SysType}}
+#    index = state[1]
+#    if index <= length(traj)
+#        #reader = similar_system(traj)
+#        reader = state[2]
+#        rp = latest_reaction(traj, index)
+#        DataTypes.import_static!(reader, traj, rp)
+#        DataTypes.import_dynamic!(reader, traj, index)
+#        return (step=get_timestep(traj, index), snap=reader), (index+1, reader)
+#    else
+#        return nothing
+#    end
+#end
 
 function firstindex(traj::AbstractTrajectory)
     return 1
@@ -107,7 +93,7 @@ function hmdsave(
         print("progress: $(100*i÷nsnap)%    \r")
         add_snapshot!(
             file_handler,
-            reader.reader,
+            reader.snap,
             reader.step,
             precision;
             reaction = is_reaction(traj, index),
@@ -197,7 +183,7 @@ function Base.iterate(traj_file::AbstractFileFormat)
     static_cache = deepcopy(reader)
     DataTypes.import_dynamic!(reader, traj_file, step=timesteps[index])
 
-    return (step=timesteps[index], reader=reader), (index+1, reaction_steps, timesteps, static_cache)
+    return (step=timesteps[index], snap=reader), (index+1, reaction_steps, timesteps, static_cache)
 end
 
 function Base.iterate(traj_file::AbstractFileFormat, state::Tuple{Int64, Vector{Int64}, Vector{Int64}, S}) where {S<:AbstractSystem}
@@ -218,5 +204,5 @@ function Base.iterate(traj_file::AbstractFileFormat, state::Tuple{Int64, Vector{
     end
     DataTypes.import_dynamic!(reader, traj_file; step=timesteps[index])
 
-    return (step=timesteps[index], reader=reader), (index+1, reaction_steps, timesteps, static_cache)
+    return (step=timesteps[index], snap=reader), (index+1, reaction_steps, timesteps, static_cache)
 end
