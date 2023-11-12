@@ -57,7 +57,16 @@ using ..HierarchyLabels
     add_position!,
     add_positions!,
     set_position!,
-    set_position!,
+    get_velocity,
+    all_velocities,
+    add_velocity!,
+    add_velocities!,
+    set_velocity!,
+    get_force,
+    all_forces,
+    add_force!,
+    add_forces!,
+    set_force!,
     all_travels,
     travel,
     set_travel!,
@@ -90,11 +99,6 @@ using ..HierarchyLabels
     issub,
     super,
     sub,
-
-    # system property interface
-    prop_names,
-    prop,
-    set_prop!,
 
     # system io interface
     AbstractFileFormat,
@@ -174,7 +178,7 @@ include("boundingbox.jl")
 
 struct GeneralSystem <: AbstractSystemType end
 
-mutable struct System{D, F<:AbstractFloat, SysType<:AbstractSystemType, L} <: AbstractSystem{D, F, SysType}
+mutable struct System{D, F<:AbstractFloat, S<:AbstractSystemType, L} <: AbstractSystem{D, F, S}
     time::F
     topology::SimpleWeightedGraph{Int64, Rational{BO_Precision}}
     box::BoundingBox{D, F, L}
@@ -186,7 +190,10 @@ mutable struct System{D, F<:AbstractFloat, SysType<:AbstractSystemType, L} <: Ab
     element::Vector{Atomic_Number_Precision}
 
     hierarchy::Dict{String, LabelHierarchy}
-    props::Dict{String, Array}
+
+    # optional properties
+    velocity::Vector{SVector{D, F}}
+    force::Vector{SVector{D, F}}
 end
 
 function System{D, F, SysType}() where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
@@ -199,7 +206,8 @@ function System{D, F, SysType}() where {D, F<:AbstractFloat, SysType<:AbstractSy
         false,
         Atomic_Number_Precision[],
         Dict{String, LabelHierarchy}(),
-        Dict{String, Array}()
+        Vector{SVector{D, F}}(undef, 0),
+        Vector{SVector{D, F}}(undef, 0)
     )
 end
 
@@ -224,17 +232,18 @@ function Base.similar(s::System{D, F, SysType, L}; reserve_dynamic::Bool=false, 
     if reserve_dynamic
         set_time!(sim, time(s))
         set_box!(sim, box(s))
-        sim.position = s.position
-        sim.travel = s.travel
+        sim.position = deepcopy(s.position)
+        sim.travel = deepcopy(s.travel)
         sim.wrapped = s.wrapped
-        sim.props = s.props
+        sim.velocity = deepcopy(s.velocity)
+        sim.force = deepcopy(s.force)
     end
     if reserve_static
-        sim.topology = s.topology
-        sim.hierarchy = s.hierarchy
-        sim.element = s.element
+        sim.topology = deepcopy(s.topology)
+        sim.hierarchy = deepcopy(s.hierarchy)
+        sim.element = deepcopy(s.element)
     end
-    return deepcopy(sim)
+    return sim
 end
 
 function Base.show(io::IO, ::MIME"text/plain", s::System{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
@@ -262,6 +271,10 @@ end
 
 function set_time!(s::System, time::AbstractFloat)
     s.time = time
+end
+
+function set_time!(s::System, time::Unitful.Time)
+    s.time = uconvert(u"ns", time)
 end
 
 function topology(s::System)
@@ -318,7 +331,7 @@ end
 function add_position!(s::System, x::AbstractVector{<:AbstractFloat})
     push!(s.position, x)
     if wrapped(s)
-        error("atom addition with wrapped coordinates is not supprted. ")
+        error("atom coordinate is wrapped. Call unwrap!(s) before adding atom.")
     end
     push!(s.travel, zeros(Int16, 3))
 
@@ -328,7 +341,7 @@ end
 function add_positions!(s::System, x::AbstractVector{<:AbstractVector{<:AbstractFloat}})
     append!(all_positions(s), x)
     if wrapped(s)
-        error("atom addition with wrapped coordinates is not supprted. ")
+        error("atom coordinate is wrapped. Call unwrap!(s) before adding atom.")
     end
     append!(s.travel, [zeros(Int16, 3) for _ in 1:length(x)])
 
@@ -339,12 +352,113 @@ function set_position!(s::System, atom_id::Integer, x::AbstractVector{<:Abstract
     s.position[atom_id] = x
 end
 
-function set_position!(s::System, label::HLabel, x::AbstractVector{<:AbstractFloat})
-    if !is_atom(label)
-        error("label $label is not for atom. ")
-    end
-    set_position!(s, label, x)
+function set_position!(s::System, atom_id::Integer, x::AbstractVector{T}) where {T<:Unitful.Length}
+    s.position[atom_id][1] = uconvert(u"Å", x[1]) |> ustrip
+    s.position[atom_id][2] = uconvert(u"Å", x[2]) |> ustrip
+    s.position[atom_id][3] = uconvert(u"Å", x[3]) |> ustrip
+end
 
+function get_velocity(s::System, atom_id::Integer)
+    return s.velocity[atom_id]
+end
+
+function all_velocities(s::System)
+    return s.velocity
+end
+
+function add_velocity!(s::System, x::AbstractVector{T}) where {T<:Real}
+    push!(s.velocity, x)
+    return nothing
+end
+
+function add_velocity!(
+    s::System{D, F, S},
+    x::AbstractVector{T}
+) where {D, F<:AbstractFloat, S<:AbstractSystemType, T<:Unitful.Velocity}
+    push!(
+        s.velocity,
+        SVector{D, F}(uconvert(u"Å/ns", e).val for e in x)
+    )
+    return nothing
+end
+
+function add_velocities!(s::System, x::AbstractVector{AbstractVector{T}}) where {T<:Real}
+    append!(s.velocity, x)
+    return nothing
+end
+
+function add_velocities!(
+    s::System{D, F, S},
+    vecs::AbstractVector{AbstractVector{T}}
+) where {D, F<:AbstractFloat, S<:AbstractSystemType, T<:Unitful.Velocity}
+    append!(
+        s.velocity,
+        [SVector{D, F}(uconvert(u"Å/ns", e).val for e in x) for x in vecs]
+    )
+    return nothing
+end
+
+function set_velocity!(s::System, atom_id::Integer, x::AbstractVector{T}) where {T<:Real}
+    s.velocity[atom_id] = x
+    return nothing
+end
+
+function set_velocity!(s::System, atom_id::Integer, x::AbstractVector{T}) where {T<:Unitful.Velocity}
+    s.velocity[atom_id][1] = uconvert(u"Å/ns", x[1]) |> ustrip
+    s.velocity[atom_id][2] = uconvert(u"Å/ns", x[2]) |> ustrip
+    s.velocity[atom_id][3] = uconvert(u"Å/ns", x[3]) |> ustrip
+    return nothing
+end
+
+function get_force(s::System, atom_id::Integer)
+    return s.force[atom_id]
+end
+
+function all_forces(s::System)
+    return s.force
+end
+
+function add_force!(s::System, x::AbstractVector{T}) where {T<:Real}
+    push!(s.force, x)
+    return nothing
+end
+
+function add_force!(
+    s::System{D, F, S},
+    x::AbstractVector{T}
+) where {D, F<:AbstractFloat, S<:AbstractSystemType, T<:Unitful.Force}
+    push!(
+        s.focrce[atom_id],
+        SVector{D, F}(uconvert(u"eV/Å", e).val for e in x)
+    )
+    return nothing
+end
+
+function add_forces!(s::System, x::AbstractVector{AbstractVector{T}}) where {T<:Real}
+    append!(s.force, x)
+    return nothing
+end
+
+function add_forces!(
+    s::System{D, F, S},
+    vecs::AbstractVector{AbstractVector{T}}
+) where {D, F<:AbstractFloat, S<:AbstractSystemType, T<:Unitful.Force}
+    append!(
+        s.force,
+        [SVector{D, F}(uconvert(u"eV/Å", e).val for e in x) for x in vecs]
+    )
+    return nothing
+end
+
+function set_force!(s::System, atom_id::Integer, x::AbstractVector{T}) where {T<:Real}
+    s.force[atom_id] = x
+    return nothing
+end
+
+function set_force!(s::System, atom_id::Integer, x::AbstractVector{T}) where {T<:Unitful.Force}
+    s.force[atom_id][1] = uconvert(u"eV/Å", x[1]) |> ustrip
+    s.force[atom_id][2] = uconvert(u"eV/Å", x[2]) |> ustrip
+    s.force[atom_id][3] = uconvert(u"eV/Å", x[3]) |> ustrip
     return nothing
 end
 
@@ -477,7 +591,7 @@ function is_atom(label::HLabel)
 end
 
 include("label_manipulation.jl")
-include("property.jl")
+#include("property.jl")
 include("system_io.jl")
 include("trajectory.jl")
 include("test.jl")

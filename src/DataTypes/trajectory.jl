@@ -4,16 +4,6 @@ export latest_reaction, latest_reaction_step, add!, update_reader!, add!
 export setproperty!, length
 export add_snapshot!, get_timesteps, get_reactions, get_metadata
 
-#use case
-# 原子位置情報の追跡
-# 時系列propの追跡
-
-#設計
-# 1. buffer::systemを与えて時系列データのポインタだけ差し替え
-# 2. Systemのbase関数を多重ディスパッチでtrajctoryに拡張 read_onlyならいける?
-# -> 2を採用(2の内部で結局1と同じことを実行する)
-
-
 Base.@kwdef mutable struct Trajectory{D, F<:AbstractFloat, SysType<:AbstractSystemType, L} <: AbstractTrajectory{D, F, SysType}
     # Vector of System. Properties which does not changes at evety timestep are empty except for reactions.
     systems::Vector{System{D, F, SysType, L}} = System{D, F, SysType, L}[]
@@ -56,9 +46,34 @@ function get_timestep(traj::Trajectory{D, F, SysType, L}, index::Integer) where 
     return all_timesteps(traj)[index]
 end
 
-function prop(traj::Trajectory, index::Integer, pname::AbstractString)
-    return prop(get_system(traj, index), pname)
+function getindex(traj::AbstractTrajectory{D, F, SysType}, index::Integer) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
+    if !(0 < index <= length(traj))
+        throw(BoundsError(traj, index))
+    end
+
+    replica = similar_system(traj)
+    # set properties that changes only at reaction
+    rp = get_system(traj, latest_reaction(traj, index))
+    replica.element = all_elements(rp) |> deepcopy
+    replica.topology = topology(rp) |> deepcopy
+    replica.hierarchy = deepcopy(rp.hierarchy)
+
+    # set properties that changes at every step
+    current = get_system(traj, index)
+    set_time!(replica, time(current))
+    set_box!(replica, deepcopy(box(current)))
+    replica.position = all_positions(current) |> deepcopy
+    replica.travel = deepcopy(current.travel)
+
+    # others
+    replica.wrapped = current.wrapped
+
+    return replica
 end
+
+#function prop(traj::Trajectory, index::Integer, pname::AbstractString)
+#    return prop(get_system(traj, index), pname)
+#end
 
 function Base.length(traj::Trajectory{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     return length(traj.systems)
@@ -114,7 +129,6 @@ function add!(traj::Trajectory{D, F, SysType, L}, s::System{D, F, SysType, L}, t
         replica.position = all_positions(s)
         replica.travel = s.travel
         replica.wrapped = s.wrapped
-        replica.props = s.props
         push!(traj.systems, replica)
     end
 
@@ -149,7 +163,6 @@ function import_dynamic!(reader::System{D, F, S1}, traj::Trajectory{D, F, S2}, i
     reader.position = all_positions(s)
     reader.travel = s.travel
     reader.wrapped = s.wrapped
-    reader.props = s.props
 
     return nothing
 end

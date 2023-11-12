@@ -20,3 +20,16 @@ end
 function BoundingBox{D, F}() where {D, F<:AbstractFloat}
     BoundingBox{D, F, D*D}(zeros(F, 3), Matrix{F}(I, D, D))
 end
+
+function BoundingBox{D, F}(origin::AbstractVector{T}, axis::AbstractMatrix{T}) where {D, F<:AbstractFloat, T<:Unitful.Length}
+    _origin = (ustrip∘uconvert).(u"Å", origin)
+    _axis = (ustrip∘uconvert).(u"Å", axis)
+
+    d = det(_axis)
+    if d < 0
+        error("left-handed system not allowed")
+    elseif d == 0
+        error("box is degenerated")
+    end
+    return BoundingBox{D, F, D*D}(SVector{D, F}(_origin), SMatrix{D, D, F, D*D}(_axis))
+end

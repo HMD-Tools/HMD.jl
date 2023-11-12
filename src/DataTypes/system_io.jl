@@ -122,12 +122,6 @@ function hmdsave(
         end
     end
 
-    # properties
-    file["property_names"] = prop_names(s)
-    for pname in prop_names(s)
-        file["props/$pname"] = get_prop(s, pname)
-    end
-
     return nothing
 end
 
@@ -165,10 +159,6 @@ function import_dynamic!(
         reinterpret(SVector{D, Int16}, reshape(mat, length(mat)))
     end
     s.wrapped = read(file, "wrapped")
-
-    for pname in read(file, "property_names")
-        set_prop!(s, pname, read(file, "props/$pname"))
-    end
 
     return nothing
 end
