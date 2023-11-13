@@ -107,6 +107,13 @@ function hmdsave(
 
     file["element"] = all_elements(s)
 
+    if haskey(file, "velocity")
+        file["velocity"] = serialize(all_velocities(s), precision)
+    end
+    if haskey(file, "force")
+        file["force"] = serialize(all_forces(s), precision)
+    end
+
     # topology
     stopo = serialize(topology(s))
     for fname in fieldnames(SerializedTopology)
@@ -159,6 +166,19 @@ function import_dynamic!(
         reinterpret(SVector{D, Int16}, reshape(mat, length(mat)))
     end
     s.wrapped = read(file, "wrapped")
+
+    if haskey(file, "velocity")
+        s.velocity = let
+            mat = read(file, "velocity")
+            reinterpret(SVector{D, F}, reshape(mat, length(mat)))
+        end
+    end
+    if haskey(file, "force")
+        s.velocity = let
+            mat = read(file, "force")
+            reinterpret(SVector{D, F}, reshape(mat, length(mat)))
+        end
+    end
 
     return nothing
 end

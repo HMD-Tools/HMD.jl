@@ -5,31 +5,7 @@ highlevelの引数をすべて具象型にすべきか？
 iteratorをlowlevelに落とすことを検討
 """
 
-function getindex(traj::AbstractTrajectory{D, F, SysType}, index::Integer) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
-    if !(0 < index <= length(traj))
-        throw(BoundsError(traj, index))
-    end
 
-    replica = similar_system(traj)
-    # set properties that changes only at reaction
-    rp = get_system(traj, latest_reaction(traj, index))
-    replica.element = all_elements(rp) |> deepcopy
-    replica.topology = topology(rp) |> deepcopy
-    replica.hierarchy = deepcopy(rp.hierarchy)
-
-    # set properties that changes at every step
-    current = get_system(traj, index)
-    set_time!(replica, time(current))
-    set_box!(replica, deepcopy(box(current)))
-    replica.position = all_positions(current) |> deepcopy
-    replica.travel = deepcopy(current.travel)
-    replica.props = deepcopy(current.props)
-
-    # others
-    replica.wrapped = current.wrapped
-
-    return replica
-end
 
 #function Base.iterate(traj::AbstractTrajectory{D, F, SysType}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
 #    index = 1
@@ -86,6 +62,13 @@ function hmdsave(
         @warn "For molecular dynamics, Float16 is not appropriate in most cases. \n"
     end
 
+    change_wrap = false
+    if wrapped(traj)
+        @warn "Trajectory is wrapped. Saving unwrapped format..."
+        change_wrap = true
+        unwrap!(traj)
+    end
+
     nsnap = length(traj)
     file_handler = h5traj(name, "w")
     index = 1
@@ -103,7 +86,55 @@ function hmdsave(
     end
     println()
 
+    if change_wrap
+        wrap!(traj)
+    end
+
     close(file_handler)
+end
+
+function hmdsave_new(
+    name::AbstractString,
+    traj::AbstractTrajectory{D, F, SysType};
+    precision = F
+) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
+    if precision < F && precision != Float16
+        @info "warning: saving precision is lower than the system precision. \n" *
+            "This cause information loss."
+    elseif precision == Float16
+        @warn "For molecular dynamics, Float16 is not appropriate in most cases. \n"
+    end
+
+    change_wrap = false
+    if wrapped(traj)
+        @warn "Trajectory is wrapped. Saving unwrapped format..."
+        change_wrap = true
+        unwrap!(traj)
+    end
+
+    file_handler = h5traj_new(name, "w", traj[1], length(traj), precision)
+    file = DataTypes.get_file(file_handler)
+    nsnap = length(traj)
+    try
+        for (i, reader) in enumerate(traj)
+            print("progress: $(100*i÷nsnap)%    \r")
+            DataTypes.add_snapshot_new!(
+                file_handler,
+                reader.snap,
+                i;
+                reaction = is_reaction(traj, i),
+                unsafe = true,
+            )
+        end
+        file["/timesteps"][1:length(traj),1] = [get_timestep(traj, i) for i in 1:nsnap]
+        file["/times"][1:length(traj),1] = [time(r.snap) for r in traj]
+        println()
+    finally
+        close(file_handler)
+        change_wrap && wrap!(traj)
+    end
+
+    return nothing
 end
 
 function read_traj(name::AbstractString, D::Integer, F::Type{<:AbstractFloat}, S::Type{<:AbstractSystemType})

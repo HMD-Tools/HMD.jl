@@ -223,9 +223,20 @@ function hmdsave(
         @warn "For molecular dynamics, Float16 is not appropriate in most cases. \n"
     end
 
+    change_wrap = false
+    if wrapped(s)
+        @warn "System is wrapped. Saving unwrapped format..."
+        change_wrap = true
+        unwrap!(s)
+    end
+
     file = h5system(name, "w")
     DataTypes.hmdsave(file, s, precision; compress=compress)
     close(file)
+
+    if change_wrap
+        wrap!(s)
+    end
 
     return nothing
 end
