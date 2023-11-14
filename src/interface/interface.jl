@@ -99,16 +99,15 @@ super(s::AbstractSystem, hname::AbstractString, label::HLabel) = _NI("super")
 sub(s::AbstractSystem, hname::AbstractString, label::HLabel) = _NI("sub")
 
 # system property interface
-prop_names(s::AbstractSystem) = NI("prop_names")
-prop(s::AbstractSystem, pname::AbstractString) = NI("prop")
-add_prop!(s::AbstractSystem, pname::AbstractString, p::AbstractArray) = NI("add_prop!")
-set_prop!(s::AbstractSystem, pname::AbstractString, p::AbstractArray) = NI("set_prop!")
-set_prop!(s::AbstractSystem, pname::AbstractString, p::Union{Float64, Float32}) = NI("set_prop!")
+#prop_names(s::AbstractSystem) = NI("prop_names")
+#prop(s::AbstractSystem, pname::AbstractString) = NI("prop")
+#add_prop!(s::AbstractSystem, pname::AbstractString, p::AbstractArray) = NI("add_prop!")
+#set_prop!(s::AbstractSystem, pname::AbstractString, p::AbstractArray) = NI("set_prop!")
+#set_prop!(s::AbstractSystem, pname::AbstractString, p::Union{Float64, Float32}) = NI("set_prop!")
 
 # system_io interface
 abstract type AbstractFileFormat end
-close(file_handler::AbstractFileFormat) = _NI("close")
-# TODO Abstract File Formatを元にsystemとtrajectoryの構成をつくる
+#close(file_handler::AbstractFileFormat) = _NI("close")
 
 # trajectory interface
 empty_trajectory(s::AbstractSystem) = _NI("empty_trajectory")
@@ -136,24 +135,8 @@ prop(s::AbstractSystem, index::Integer, pname::AbstractString) = NI("prop")
 add_snapshot!(
     file_handler::AbstractFileFormat,
     s::AbstractSystem{D, F},
-    step::Int64,
-    precision::Type{<:AbstractFloat} = F;
+    index::Integer,
     reaction::Bool = false,
     unsafe::Bool = false
 ) where {D, F<:AbstractFloat} = _NI("add_snapshot!")
-import_dynamic!(
-    reader::AbstractSystem{D, F},
-    traj_file::AbstractFileFormat,
-    precision::Type{<:AbstractFloat} = F;
-    index::Int64 = typemin(Int64),
-    step::Int64 = typemin(Int64)
-) where {D, F<:AbstractFloat} = _NI("import_dynamic!")
-import_static!(reader::AbstractSystem, traj_file::AbstractFileFormat; index::Int64=typemin(Int64), step::Int64=typemin(Int64)) = _NI("import_dynamic!")
-latest_reaction_step(traj_file::AbstractFileFormat, current_step::Integer) = _NI("latest_reaction_step")
-get_timesteps(traj_file::AbstractFileFormat) = _NI("get_timesteps")
-get_reactions(traj_file::AbstractFileFormat) = _NI("get_reactions")
 get_metadata(traj_file::AbstractFileFormat) = _NI("get_metadata")
-is_reaction(traj_file::AbstractFileFormat, index::Integer) = _NI("is_reaction")
-length(traj_file::AbstractFileFormat) = _NI("length")
-wrapped(traj_file::AbstractFileFormat) = _NI("wrapped")
-similar_system(traj_file::AbstractFileFormat) = _NI("similar_system")

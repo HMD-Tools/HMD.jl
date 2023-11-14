@@ -122,11 +122,6 @@ using ..HierarchyLabels
     wrapped,
     wrap!,
     unwrap!,
-    add_snapshot!,
-    latest_reaction_step,
-    get_timesteps,
-    get_reactions,
-    get_metadata,
     is_reaction,
     length,
     getindex,
@@ -136,18 +131,7 @@ using ..HierarchyLabels
 
     # trajectory io interface
     add_snapshot!,
-    import_dynamic!,
-    import_static!,
-    latest_reaction_step,
-    get_timesteps,
-    get_reactions,
-    get_metadata,
-    is_reaction,
-    length,
-    getindex,
-    lastindex,
-    firstindex,
-    wrapped
+    get_metadata
 
 # core subtype signature
 export Position, BoundingBox, HLabel, LabelHierarchy
@@ -156,8 +140,8 @@ export Position, BoundingBox, HLabel, LabelHierarchy
 export GeneralSystem, System, print_to_string
 
 # fileIO
-export H5system, H5traj, SerializedTopology, PackedHierarchy
-export h5system, h5traj, get_file
+export H5traj, SerializedTopology, PackedHierarchy
+export h5traj, get_file, read_traj
 
 #constants
 export Entire_System, BO_Precision, atom_mass, Atom_Label, Atomic_Number_Precision
@@ -592,8 +576,9 @@ end
 
 include("label_manipulation.jl")
 #include("property.jl")
-include("system_io.jl")
+#include("system_io.jl")
 include("trajectory.jl")
+include("trajectory_HDF5.jl")
 include("test.jl")
 
 function merge!(

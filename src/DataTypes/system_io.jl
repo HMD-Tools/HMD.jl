@@ -2,59 +2,6 @@
 ##### HDF5 IO
 #####
 
-function serialize(vec::Vector{SVector{D, T}}, Tconvert=T) where {D, T<:Real}
-    #return [vec[atom_id][dim] for dim in 1:D, atom_id in eachindex(vec)]
-    spos = Matrix{Tconvert}(undef, D, length(vec))
-    for atom_id in eachindex(vec)
-        spos[:, atom_id] = vec[atom_id]
-    end
-    return spos
-end
-
-function deserialize(D::Integer, mat::Matrix{T}, Tconvert=T) where {T<:Real}
-    pos = Vector{SVector{D, Tconvert}}(undef, size(mat, 2))
-    #resize!(pos, size(mat, 2))
-    for atom_id in eachindex(pos)
-        pos[atom_id] = mat[:, atom_id]
-    end
-    return pos::Vector{SVector{D, Tconvert}}
-end
-
-struct SerializedTopology
-    num_node::Int64
-    edges_org::Vector{Int64}
-    edges_dst::Vector{Int64}
-    denominator::Vector{BO_Precision}
-    numerator::Vector{BO_Precision}
-end
-
-function serialize(topo::SimpleWeightedGraph)
-    num_node = nv(topo)
-    edges_org = Vector{Int64}(undef, ne(topo))
-    edges_dst = Vector{Int64}(undef, ne(topo))
-    denominator = Vector{Int16}(undef, ne(topo))
-    numerator = Vector{Int16}(undef, ne(topo))
-
-    for (i, edge) in enumerate(edges(topo))
-        edges_org[i], edges_dst[i] = src(edge), dst(edge)
-        weight = get_weight(topo, edges_org[i], edges_dst[i])
-        denominator[i], numerator[i] = weight.den, weight.num
-    end
-
-    return SerializedTopology(num_node, edges_org, edges_dst, denominator, numerator)
-end
-
-function deserialize(ser_topo::SerializedTopology)
-    topo = SimpleWeightedGraph{Int64, Rational{BO_Precision}}()
-    add_vertices!(topo, ser_topo.num_node)
-    for i in 1:length(ser_topo.edges_org)
-        add_edge!(topo, ser_topo.edges_org[i], ser_topo.edges_dst[i], Rational{BO_Precision}(ser_topo.numerator[i], ser_topo.denominator[i]))
-        #add_edge!(topo, ser_topo.edges_org[i], ser_topo.edges_dst[i], ser_topo.numerator[i]//ser_topo.denominator[i])
-    end
-
-    return topo
-end
-
 mutable struct H5system <: AbstractFileFormat
     file::Union{HDF5.File, HDF5.Group}
 end

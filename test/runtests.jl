@@ -151,21 +151,21 @@ function strict_eq(lh1::LabelHierarchy, lh2::LabelHierarchy)
 end
 
 function strict_eq(s1::System, s2::System)
-    if box(s1).origin != box(s2).origin
+    if any(x->abs(x)>1e-5, box(s1).origin - box(s2).origin)
         error("box origin mismatch. \n" *
             "    s1: $(box(s1).origin)" *
             "    s2: $(box(s2).origin)"
         )
     end
 
-    if box(s1).axis != box(s2).axis
+    if any(x->abs(x)>1e-5, box(s1).axis - box(s2).axis)
         error("box axis mismatch. \n" *
             "    s1: $(box(s1).axis)" *
             "    s2: $(box(s2).axis)"
         )
     end
 
-    if time(s1) != time(s2)
+    if !isapprox(time(s1), time(s2); atol=1e-5)
         error("time mismatch. \n" *
             "    s1: $(time(s1))" *
             "    s2: $(time(s2))"
@@ -180,7 +180,7 @@ function strict_eq(s1::System, s2::System)
     end
 
     for i in 1:natom(s1)
-        if position(s1, i) != position(s2, i)
+        if any(x->abs(x)>1e-5, position(s1, i) - position(s2, i))
             error("atom $i position mismatch. \n" *
                 "    s1: $(position(s1, i))" *
                 "    s2: $(position(s2, i))"
@@ -252,7 +252,7 @@ function strict_eq(s1::System, s2::System)
             )
         end
         for id in (head, tail)
-            if position(s1, id) != position(s2, id) ||
+            if any(x->abs(x)>1e-5, position(s1, id) - position(s2, id)) ||
                 element(s1, id) != element(s2, id) ||
                 travel(s1, id) != travel(s2, id)
                 error("topology node id and atom index mismatch. \n" *

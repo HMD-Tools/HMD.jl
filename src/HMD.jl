@@ -12,7 +12,7 @@ using StaticArrays
 
 import Base: getindex, firstindex, lastindex, setproperty!, iterate, length, precision, close, string, show, showerror
 import Base: >, <, >=, <=, +, -, *, /, ==, position
-import Base: position, time, contains, promote_type, promote_rule, similar, merge!
+import Base: time, contains, promote_type, promote_rule, similar, merge!
 import Graphs: neighbors
 @reexport import Base: sort
 
@@ -124,15 +124,7 @@ export
 
     # trajectory io interface
     add_snapshot!,
-    import_dynamic!,
-    import_static!,
-    latest_reaction_step,
-    get_timesteps,
-    get_reactions,
     get_metadata,
-    is_reaction,
-    length,
-    wrapped,
 
     # System highlevel interfaces
     is_atom,
@@ -149,16 +141,13 @@ export
     super_labels,
     sub_labels,
     hierarchy_leaf_isatom,
-    hmdsave,
-    read_system,
 
     # Trajectory highlevel interfaces
     length,
     getindex,
     firstindex,
     lastindex,
-    iterate,
-    similar,
+    getindex,
     iterate,
     hmdsave,
     read_traj,
@@ -174,7 +163,6 @@ include("interface/interface.jl")
 include("DataTypes/DataTypes.jl")
 @reexport using .DataTypes
 
-#import .DataTypes: hmdsave, hmdread!
 include("interface/system_highlevel.jl")
 include("interface/trajectory_highlevel.jl")
 
