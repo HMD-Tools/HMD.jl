@@ -308,7 +308,9 @@ function Base.iterate(st::SubTrajectory{D, F, S, L, R}) where {D, F<:AbstractFlo
     real_idx = st.traj_range[pseude_idx]
     reader = similar_system(st.traj)
     import_dynamic!(reader, st.traj, real_idx)
-    import_static!(reader, st.traj, real_idx)
+
+    rp = latest_reaction(st.traj, real_idx)
+    import_static!(reader, st.traj, rp)
 
     return (step=get_timestep(st.traj, real_idx), snap=reader), (pseude_idx+1, reader)
 end
