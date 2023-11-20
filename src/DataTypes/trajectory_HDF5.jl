@@ -377,7 +377,7 @@ function h5traj_reader(name::AbstractString, F::Type{<:AbstractFloat})
     end
 
     @assert length(timesteps) == length(times)
-    @assert length(reactions) < length(times)
+    @assert length(reactions) <= length(times)
 
     return H5trajReader{F}(file, times, timesteps, elems, reactions, boxes, Nsnap, Natom, has_v, has_f, hnames, atomprops)
 end
