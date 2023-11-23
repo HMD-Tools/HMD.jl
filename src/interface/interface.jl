@@ -70,7 +70,8 @@ wrap!(s::AbstractSystem) = _NI("wrap!")
 unwrap!(s::AbstractSystem) = _NI("unwrap!")
 label2atom(s::AbstractSystem, hname::AbstractString, label::HLabel) = _NI("label2atom")
 merge!(augend::AbstractSystem, addend::AbstractSystem;
-    augend_parent::HLabel, addend_parent::HLabel, unsafe::Bool=false) = NI("merge!")
+    augend_parents::Dict{String, HLabel}, addend_parents::Dict{String, HLabel},
+    unsafe::Bool=false) = NI("merge!")
 
 # system label manipulation
 hierarchy_names(s::AbstractSystem) = _NI("hierarchy_names")
@@ -79,8 +80,8 @@ add_hierarchy!(s::AbstractSystem, name::AbstractString) = _NI("add_hierarchy!")
 remove_hierarchy!(s::AbstractSystem, name::AbstractString) = _NI("remove_hierarchy!")
 all_labels(s::AbstractSystem, hname::AbstractString) = _NI("all_labels")
 all_labels(s::AbstractSystem, hname::AbstractString, label_type::AbstractString) = _NI("all_labels")
-add_label!(s::AbstractSystem, hname::AbstractString, label::HLabel) = _NI("add_label!")
-add_label!(s::AbstractSystem, hname::AbstractString, label_type::AbstractString) = _NI("add_label!")
+add_label!(s::AbstractSystem, hname::AbstractString, label::HLabel; unsafe::Bool=false) = _NI("add_label!")
+#add_label!(s::AbstractSystem, hname::AbstractString, label_type::AbstractString) = _NI("add_label!")
 add_labels!(s::AbstractSystem, hname::AbstractString, labels::AbstractVector{HLabel}) = _NI("add_labels!")
 count_label(s::AbstractSystem, hname::AbstractString, label_type::String) = _NI("count_label")
 add_relation!(s::AbstractSystem, hname::AbstractString; super::HLabel, sub::HLabel) = _NI("add_relation!")

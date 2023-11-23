@@ -94,7 +94,11 @@ function Base.show(io::IO, ::MIME"text/plain", lh::LabelHierarchy)
             subtree(lh, s, level + 1, indent)
         end
     end
-    subtree(lh, _root(lh), 1, 4)
+    if isempty(lh.labels)
+        print()
+    else
+        subtree(lh, _root(lh), 1, 4)
+    end
 end
 
 function Base.println(lh::LabelHierarchy)
@@ -158,22 +162,20 @@ function _set_label!(lh::LabelHierarchy, label::HLabel, id::Integer)
     _label2node(lh)[label] = id
 end
 
-function _add_label!(lh::LabelHierarchy, label::HLabel)
+function _add_label!(lh::LabelHierarchy, label::HLabel, unsafe::Bool=false)
     g = _hierarchy(lh)
 
-    if _contains(lh, label)
-        return Label_Occupied
+    if !unsafe
+        if _contains(lh, label)
+            return Label_Occupied
+        end
     end
 
     @assert add_vertex!(g)
-    if is_cyclic(g)
-        rem_vertex!(g, nv(g))
-        return Cycle_Found
-    end
 
     current_id = nv(g)
     push!(_labels(lh), label)
-    merge!(_label2node(lh), Dict(label => current_id))
+    push!(_label2node(lh), label => current_id)
 
     return Success
 end
@@ -184,7 +186,9 @@ function _add_labels!(lh::LabelHierarchy, labels::AbstractVector{HLabel})
     new_range = (nv(g) + one(nv(g))) : (nv(g) + length(labels))
     @assert add_vertices!(g, length(labels)) == length(labels)
     append!(lh.labels, labels)
-    merge!(_label2node(lh), Dict(label => node_id for (label, node_id) in zip(labels, new_range)))
+    for (label, node_id) in zip(labels, new_range)
+        _label2node(lh)[label] = node_id
+    end
 
     if length(_label2node(lh)) != nv(g)
         return Label_Occupied
@@ -194,12 +198,14 @@ function _add_labels!(lh::LabelHierarchy, labels::AbstractVector{HLabel})
 end
 
 function _add_relation!(lh::LabelHierarchy; super::HLabel, sub::HLabel, unsafe::Bool=false)
-    if !_contains(lh, super) || !_contains(lh, sub)
-        return Label_Missing
-    elseif super == sub
-        return Label_Duplication
-    elseif _has_relation(lh, super, sub)
-        return Relation_Occupied
+    if !unsafe
+        if !_contains(lh, super) || !_contains(lh, sub)
+            return Label_Missing
+        elseif super == sub
+            return Label_Duplication
+        elseif _has_relation(lh, super, sub)
+            return Relation_Occupied
+        end
     end
 
     g, super_id, sub_id = _hierarchy(lh), _get_nodeid(lh, super), _get_nodeid(lh, sub)
@@ -373,23 +379,7 @@ function _merge_hierarchy!(
     unsafe::Bool = false
 )
     # addend_parent自身とその上位ノードはマージから除外する
-    exception = let
-        addend_parent_id = _get_nodeid(addend, addend_parent)
-        # depth first search from addend root
-        # skips sub branch of addend_parent
-        buffer = [_root_id(addend)]
-        exception = Int64[]
-        while !isempty(buffer)
-            id = popfirst!(buffer)
-            pushfirst!(exception, id)
-            if id == addend_parent_id
-                continue
-            else
-                prepend!(buffer, _sub_id(addend, id))
-            end
-        end
-        SVector{length(exception), Int64}(exception)
-    end
+    exception = _find_exception(addend, addend_parent)
     @assert allunique(exception)
 
     # addend node id => augend node id
@@ -406,7 +396,7 @@ function _merge_hierarchy!(
 
     # augendに既に存在するラベル数を記録
     # augendになくaddendにあるラベルのcounterは0
-    counter = Dict{String, Int64}()
+    counter = Dict{String, Int64}() #
     for label in _labels(augend)
         if !haskey(counter, type(label))
             counter[type(label)] = 0
@@ -458,6 +448,41 @@ function _merge_hierarchy!(
 
     return nothing
 end
+
+"""
+木構造addendのうち、setdiff(addend, addend_parentより先の枝)のnode idを返す
+"""
+function _find_exception(addend, addend_parent)
+    addend_parent_id = _get_nodeid(addend, addend_parent)
+    # depth first search from addend root
+    # skips sub branch of addend_parent
+    buffer = [_root_id(addend)]
+    exception = Int64[]
+    while !isempty(buffer)
+        id = popfirst!(buffer)
+        pushfirst!(exception, id)
+        if id == addend_parent_id
+            # added parentより上位のノードで別の枝が分岐している場合はその枝すべてが除外対象となる
+            # これを保証するためにここではbreakせず、別の枝の探索を続ける
+            continue
+        else
+            prepend!(buffer, _sub_id(addend, id))
+        end
+    end
+
+    if length(exception) > 50
+        @warn "nodes excluded from merge is larger tha 50.\n" *
+            "This may cause performance issue."
+    end
+
+    return SVector{length(exception), Int64}(exception)
+end
+
+
+
+#####
+##### hierarchy serialization for file storage
+#####
 
 struct PackedHierarchy
     num_node::Int64

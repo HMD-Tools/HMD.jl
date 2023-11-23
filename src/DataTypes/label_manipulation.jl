@@ -32,10 +32,10 @@ function all_labels(s::System, hname::AbstractString, label_type::AbstractString
     return filter!(label -> type(label)==label_type, labels)
 end
 
-function add_label!(s::System, hname::AbstractString, label::HLabel)
+function add_label!(s::System, hname::AbstractString, label::HLabel; unsafe::Bool=false)
     lh = hierarchy(s, hname)
 
-    result = _add_label!(lh, label)
+    result = _add_label!(lh, label, unsafe)
     @match result begin
         Label_Occupied => error("label $(label) already exists. ")
         Success        => return nothing
@@ -43,18 +43,18 @@ function add_label!(s::System, hname::AbstractString, label::HLabel)
     end
 end
 
-function add_label!(s::System, hname::AbstractString, label_type::AbstractString)
-    lh = hierarchy(s, hname)
-
-    n = count_label(s, hname, label_type)
-    addend = HLabel(label_type, n+1)
-    result = _add_label!(lh, addend)
-    @match result begin
-        Label_Occupied => error("label $(label) already exists. ")
-        Success        => return addend
-        _              => error("fatal error")
-    end
-end
+#function add_label!(s::System, hname::AbstractString, label_type::AbstractString)
+#    lh = hierarchy(s, hname)
+#
+#    n = count_label(s, hname, label_type)
+#    addend = HLabel(label_type, n+1)
+#    result = _add_label!(lh, addend)
+#    @match result begin
+#        Label_Occupied => error("label $(label) already exists. ")
+#        Success        => return addend
+#        _              => error("fatal error")
+#    end
+#end
 
 function add_labels!(s::System, hname::AbstractString, labels::AbstractVector{HLabel})
     lh = hierarchy(s, hname)
@@ -70,10 +70,16 @@ function count_label(s::System, hname::AbstractString, label_type::String)
     return count(l -> type(l)==label_type, labels)
 end
 
-function add_relation!(s::System, hname::AbstractString; super::HLabel, sub::HLabel)
+function add_relation!(
+    s::System,
+    hname::AbstractString;
+    super::HLabel,
+    sub::HLabel,
+    unsafe::Bool = false
+)
     lh = hierarchy(s, hname)
 
-    result = _add_relation!(lh; super=super, sub=sub)
+    result = _add_relation!(lh; super=super, sub=sub, unsafe=unsafe)
     @match result begin
         Label_Missing     => error("Super or sub not found. ")
         Label_Duplication => error("super and sub are equal. ")
@@ -92,12 +98,19 @@ function add_relations!(s::System, hname::AbstractString; super::HLabel, subs::A
     return nothing
 end
 
-function insert_relation!(s::System, hname::AbstractString, label::HLabel; super::HLabel, sub::HLabel)
+function insert_relation!(
+    s::System,
+    hname::AbstractString,
+    label::HLabel;
+    super::HLabel,
+    sub::HLabel,
+    unsafe::Bool = false
+)
     lh = hierarchy(s, hname)
 
     add_label!(s, hname, label)
-    add_relation!(s, hname; super=super, sub=label)
-    add_relation!(s, hname; super=label, sub=sub)
+    add_relation!(s, hname; super=super, sub=label, unsafe=unsafe)
+    add_relation!(s, hname; super=label, sub=sub, unsafe=unsafe)
     _remove_relation!(lh, super, sub)
 
     return nothing

@@ -582,35 +582,91 @@ include("trajectory_HDF5.jl")
 include("test.jl")
 
 function merge!(
-    augend::System{D, F, SysType1}, addend::System{D, F, SysType2};
-    augend_parent::HLabel, addend_parent::HLabel, unsafe::Bool=false
-) where {D, F<:AbstractFloat, SysType1<:AbstractSystemType, SysType2<:AbstractSystemType}
-    # wrap check
-    wrapped(augend) != wrapped(addend) && error("augend and addend must have same wrap status. ")
+    augend::System{D, F, S1}, addend::System{D, F, S2};
+    augend_parents::Dict{String, HLabel}, addend_parents::Dict{String, HLabel},
+    unsafe::Bool = false
+) where {D, F<:AbstractFloat, S1<:AbstractSystemType, S2<:AbstractSystemType}
+    # unwrap if sysytem is wrapped
+    change_augend = change_addend = false
+    if wrapped(augend)
+        unwrap(augend)
+        change_augend = true
+    end
+    if wrapped(addend)
+        unwrap(addend)
+        change_addend = true
+    end
+
+    # check whther target hieararchies to merge exists in each systems
+    if !(keys(augend_parents) ⊆ hierarchy_names(augend))
+        error(
+            "augend_parents must be a subset of augend hierarchy\n" *
+            "   augend hierarchies: $(keys(augend_parents))\n" *
+            "   targets: $(hierarchy_names(augend))"
+        )
+    elseif !(keys(addend_parents) ⊆ hierarchy_names(addend))
+        error(
+            "addend_parents must be a subset of addend hierarchy\n" *
+            "   addend hierarchies: $(keys(addend_parents))\n" *
+            "   targets: $(hierarchy_names(addend))"
+        )
+    end
+
+    # check whether addend and aungend parents have the same keys
+    if Set(keys(addend_parents)) != Set(keys(augend_parents))
+        error(
+            "augend_parents and addend_parents must have the same targets\n" *
+            "   augend_parents: $(keys(augend_parents))\n" *
+            "   addend_parents: $(keys(addend_parents))"
+        )
+    end
+
+    #
+    if !(hierarchy_names(addend) ⊆ hierarchy_names(augend))
+        missings = filter(
+            hname -> !(hname ∈ hierarchy_names(augend)),
+            hierarchy_names(addend)
+        )
+        error(
+            "addend hierarchy must be a subset of augend hierarchy\n" *
+            "   augend hierarchies: $(hierarchy_names(augend))\n" *
+            "   addend hierarchies: $(hierarchy_names(addend))" *
+            "   missings: $(missings)"
+        )
+    end
 
     # add new atoms to augend
+    id_mapping = natom(augend)+1 : natom(augend)+natom(addend) # id_mapping[addend_id] == augend_id
     append!(augend.position, all_positions(addend))
     append!(augend.travel, all_travels(addend))
     append!(augend.element, all_elements(addend))
 
-    merge_topology!(topology(augend), topology(addend))
+    _merge_topology!(topology(augend), topology(addend), id_mapping)
 
-    for hname in hierarchy_names(augend)
+    for hname in keys(augend_parents)
         lh_augend = hierarchy(augend, hname)
         lh_addend = hierarchy(addend, hname)
         _merge_hierarchy!(
             lh_augend, lh_addend;
-            augend_parent = augend_parent,
-            addend_parent = addend_parent,
+            augend_parent = augend_parents[hname],
+            addend_parent = addend_parents[hname],
             unsafe = unsafe
         )
     end
 
+    # restore wrapping state
+    change_augend && wrap!(augend)
+    change_addend && wrap!(addend)
+
     return nothing
 end
 
-function merge_topology!(augend::SimpleWeightedGraph, addend::SimpleWeightedGraph)
-    id_mapping = nv(augend)+1 : nv(augend)+nv(addend)
+function _merge_topology!(
+    augend::SimpleWeightedGraph,
+    addend::SimpleWeightedGraph,
+    id_mapping::AbstractVector{T}
+) where {T<:Integer}
+    @assert id_mapping == nv(augend)+1 : nv(augend)+nv(addend)
     add_vertices!(augend, nv(addend))
     for edge in edges(addend)
         weight = get_weight(addend, src(edge), dst(edge))
