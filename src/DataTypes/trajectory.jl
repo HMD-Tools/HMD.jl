@@ -134,6 +134,7 @@ function add!(traj::Trajectory{D, F, SysType, L}, s::System{D, F, SysType, L}, t
     return nothing
 end
 
+# TODO: implement add!(::SubTrajectory)
 function add!(
     traj::Trajectory{D, F, SysType, L}, addend::Trajectory{D, F, SysType, L}
 ) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}

@@ -317,7 +317,7 @@ function add_position!(s::System, x::AbstractVector{<:AbstractFloat})
     if wrapped(s)
         error("atom coordinate is wrapped. Call unwrap!(s) before adding atom.")
     end
-    push!(s.travel, zeros(Int16, 3))
+    push!(s.travel, SVector{3, Int16}(0, 0, 0))
 
     return nothing
 end
@@ -327,7 +327,7 @@ function add_positions!(s::System, x::AbstractVector{<:AbstractVector{<:Abstract
     if wrapped(s)
         error("atom coordinate is wrapped. Call unwrap!(s) before adding atom.")
     end
-    append!(s.travel, [zeros(Int16, 3) for _ in 1:length(x)])
+    append!(s.travel, [SVector{3, Int16}(0, 0, 0) for _ in 1:length(x)])
 
     return nothing
 end
@@ -467,7 +467,7 @@ function _change_wrap!(s::System)
 end
 
 function _floor_rem(c::SVector{D, F}) where {D, F<:AbstractFloat}
-    ipart = SVector{D, Int16}(Int16(floor(x)) for x in c)
+    ipart = SVector{D, Int16}(floor(Int16, x) for x in c)
     fpart = c - ipart
     return ipart, fpart
 end
@@ -478,15 +478,12 @@ function wrap!(s::System{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<
     end
 
     axis = box(s).axis
-    origin = box(s).origin
     for id in 1:natom(s)
         # convert coordinates from Cartesian to box vectors i.e.
         # x = c[1] .* axis[:,1] .+ c[2] .* axis[:,2] .+ ...
         c = _box_coord(position(s, id), box(s))
         iparts, fparts = _floor_rem(c)
-        pos = map(1:D) do dim
-            fparts[dim] * axis[:,dim]
-        end |> p->reduce(+, p)
+        pos = sum(fparts[dim] * axis[:,dim] for dim in 1:D)
         set_travel!(s, id, iparts)
         set_position!(s, id, pos)
     end
@@ -505,9 +502,9 @@ function unwrap!(s::System{D, F, SysType, L}) where {D, F<:AbstractFloat, SysTyp
     for i in 1:natom(s)
         x = position(s, i) - origin
         n = travel(s, i)
-        pos = x + mapreduce(dim -> n[dim] * axis[:, dim], +, 1:D)
+        pos = x + sum(n[dim] * axis[:, dim] for dim in 1:D)
         set_position!(s, i, pos + origin)
-        set_travel!(s, i, zeros(Int16, 3))
+        set_travel!(s, i, SVector{3, Int16}(0, 0, 0))
     end
     _change_wrap!(s)
 
@@ -517,7 +514,7 @@ end
 """
 convert coordinates from Cartesian to box vectors.
 
-Math equation is calculated by below code with Symbolics.jl
+Math equation is calculated by the below code with Symbolics.jl
 
 # code
 ```julia-repl
