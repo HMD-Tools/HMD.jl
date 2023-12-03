@@ -169,6 +169,18 @@ function l2a(s::AbstractSystem, hname::AbstractString, label::HLabel)
     return atom_ids
 end
 
+function contains(atom_id::Integer, s::AbstractSystem, hname::AbstractString, label::HLabel)
+    return contains(atom_label(atom_id), s, hname, label)
+end
+
+function contains(atom::HLabel, s::AbstractSystem, hname::AbstractString, label::HLabel)
+    if is_atom(atom)
+        error("expected atom label, found $(atom). ")
+    end
+
+    return label ∈ super_labels(s, hname, atom)
+end
+
 function super_labels(s::AbstractSystem, hname::AbstractString, label::HLabel)
     return _traverse_from(s, hname, label, super)
 end

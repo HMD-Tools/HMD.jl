@@ -10,11 +10,11 @@ using LinearAlgebra
 using StaticArrays
 @reexport using Unitful
 
-import Base: getindex, firstindex, lastindex, setproperty!, iterate, length, precision, close, string, show, showerror
-import Base: >, <, >=, <=, +, -, *, /, ==, position
-import Base: time, contains, promote_type, promote_rule, similar, merge!
-import Graphs: neighbors
-@reexport import Base: sort
+@reexport import Base: getindex, firstindex, lastindex, setproperty!, iterate, length, precision, close, string, show, showerror
+@reexport import Base: >, <, >=, <=, +, -, *, /, ==, position
+@reexport import Base: time, contains, promote_type, promote_rule, similar, merge!
+@reexport import Graphs: neighbors
+@reexport import Base: sort, in, ∈
 
 # utility
 export oblique_coord, atom_label
