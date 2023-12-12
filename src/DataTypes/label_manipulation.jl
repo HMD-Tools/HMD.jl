@@ -119,7 +119,7 @@ end
 function remove_label!(s::System, hname::AbstractString, label::HLabel)
     lh = hierarchy(s, hname)
 
-    if !_contains!(lh, label)
+    if !_contains(lh, label)
         error("label $(label) not found. ")
     end
     _remove_label!(lh, label)

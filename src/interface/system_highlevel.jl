@@ -68,7 +68,7 @@ function add_bonds!(s::AbstractSystem, pair)
 end
 
 function add_bond!(s::AbstractSystem, label1::HLabel, label2::HLabel; bond_order::Rational=1//1)
-    if !is_atom(label1) || !is_atom(label2)
+    if !isatom(label1) || !isatom(label2)
         error("label is not for atom. ")
     end
 
@@ -91,7 +91,7 @@ end
 
 # core apiに移管
 function bond_order(s::AbstractSystem, label1::HLabel, label2::HLabel)
-    if !is_atom(label1) || !is_atom(label2)
+    if !isatom(label1) || !isatom(label2)
         error("label is not for atom. ")
     end
     atom_id1 = convert(Int64, id(label1))
@@ -120,7 +120,7 @@ function valence(s::AbstractSystem, atom_id::Integer)
 end
 
 function valence(s::AbstractSystem, label::HLabel)
-    if !is_atom(label)
+    if !isatom(label)
         error("label $label is not for atom. ")
     end
 
@@ -131,7 +131,7 @@ function atom_label(atom_id::Integer)
     return HLabel("", atom_id)
 end
 
-function is_atom(label::HLabel)
+function isatom(label::HLabel)
     return type(label) == ""
 end
 
@@ -141,7 +141,7 @@ function neighbors(s::AbstractSystem, atom_id::Integer)
 end
 
 function neighbors(s::AbstractSystem, label::HLabel)
-    if !is_atom(label)
+    if !isatom(label)
         error("label $label is not for atom. ")
     end
     topo = topology(s)
@@ -153,10 +153,10 @@ function l2a(s::AbstractSystem, hname::AbstractString, label::HLabel)
     sub_labels = [label]
     atom_ids = Vector{Int64}(undef, 0)
 
-    while any(!is_atom, sub_labels)
+    while any(!isatom, sub_labels)
         sub_next = Vector{HLabel}(undef, 0)
         for l in sub_labels
-            if is_atom(l)
+            if isatom(l)
                 push!(atom_ids, convert(Int64, id(l)))
             else
                 append!(sub_next, sub(s, hname, l))
@@ -174,7 +174,7 @@ function contains(atom_id::Integer, s::AbstractSystem, hname::AbstractString, la
 end
 
 function contains(atom::HLabel, s::AbstractSystem, hname::AbstractString, label::HLabel)
-    if is_atom(atom)
+    if isatom(atom)
         error("expected atom label, found $(atom). ")
     end
 
@@ -207,9 +207,9 @@ end
 function hierarchy_leaf_isatom(s::AbstractSystem)
     for hname in hierarchy_names(s)
         for label in all_labels(s, hname)
-            if !is_atom(label) && isempty(sub(s, hname, label))
+            if !isatom(label) && isempty(sub(s, hname, label))
                 return false
-            elseif is_atom(label) && !isempty(sub(s, hname, label))
+            elseif isatom(label) && !isempty(sub(s, hname, label))
                 return false
             end
         end

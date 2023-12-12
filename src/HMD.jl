@@ -127,7 +127,7 @@ export
     get_metadata,
 
     # System highlevel interfaces
-    is_atom,
+    isatom,
     atom_label,
     add_atom!,
     add_atoms!,

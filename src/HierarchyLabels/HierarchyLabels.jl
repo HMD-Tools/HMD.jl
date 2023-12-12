@@ -26,6 +26,13 @@ struct HLabel
     id::Int64
 end
 
+function HLabel(type::AbstractString, id::Integer)
+    if !isascii(type)
+        error("label type must be ascii string. ")
+    end
+    return HLabel(type, convert(Int64, id))
+end
+
 function id(label::HLabel)
     return label.id
 end
