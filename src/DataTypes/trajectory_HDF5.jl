@@ -285,9 +285,10 @@ function _add_topology!(file, topo, index)
 end
 
 function _add_hierarchy!(file, hname, lh, index)
-    if haskey(file, "hierarchy/$index")
-        close(file)
-        error("hierarchy at $index already exists. ")
+    if !haskey(file, "hierarchy/$index")
+        #close(file)
+        #error("hierarchy at $index already exists. ")
+        create_group(file, "hierarchy/$index")
     end
 
     ser_hierarchy = serialize(lh)
