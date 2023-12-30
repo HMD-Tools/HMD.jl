@@ -286,8 +286,6 @@ end
 
 function _add_hierarchy!(file, hname, lh, index)
     if !haskey(file, "hierarchy/$index")
-        #close(file)
-        #error("hierarchy at $index already exists. ")
         create_group(file, "hierarchy/$index")
     end
 
