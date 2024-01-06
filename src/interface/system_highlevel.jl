@@ -13,20 +13,30 @@ const Entire_System = HLabel("entire_system", 1)
 #    elements[:Cl].symbol => 35.453
 #)
 
-function add_atom!(s::AbstractSystem, x::AbstractVector{<:AbstractFloat}, elem::Integer; super::HLabel)
+function add_atom!(
+    s::AbstractSystem,
+    x::AbstractVector{<:AbstractFloat},
+    elem::Integer;
+    super::Dict{String, HLabel}
+)
     atom_id = natom(s) + 1
     add_position!(s, x)
     add_element!(s, elem)
     @assert add_vertex!(topology(s))
     for hname in hierarchy_names(s)
         add_label!(s, hname, atom_label(atom_id))
-        add_relation!(s, hname; super=super, sub=atom_label(atom_id))
+        add_relation!(s, hname; super=super[hname], sub=atom_label(atom_id))
     end
 
     return nothing
 end
 
-function add_atoms!(s::AbstractSystem, x::AbstractVector{<:AbstractVector{<:AbstractFloat}}, elem::AbstractVector{<:Integer}; super::HLabel)
+function add_atoms!(
+    s::AbstractSystem,
+    x::AbstractVector{<:AbstractVector{<:AbstractFloat}},
+    elem::AbstractVector{<:Integer};
+    super::Dict{String, HLabel}
+)
     if length(elem) != length(x)
         error("length of elem and x must be same. ")
     end
