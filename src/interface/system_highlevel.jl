@@ -49,7 +49,7 @@ function add_atoms!(
     @assert add_vertices!(topology(s), length(x))
     for hname in hierarchy_names(s)
         add_labels!(s, hname, atom_labels)
-        add_relations!(s, hname; super=super, subs=atom_labels)
+        add_relations!(s, hname; super=super[hname], subs=atom_labels)
     end
 
     return nothing
