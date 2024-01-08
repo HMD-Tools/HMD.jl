@@ -116,17 +116,17 @@ abstract type AbstractFileFormat end
 
 # trajectory interface
 empty_trajectory(s::AbstractSystem) = _NI("empty_trajectory")
+empty_trajectory(s::AbstractTrajectory, precision::Type{<:AbstractFloat}) = _NI("empty_trajectory")
 is_reaction(s::AbstractTrajectory, index::Integer) = _NI("is_reaction")
 get_system(s::AbstractTrajectory, index::Integer) = _NI("get_system")
 all_timesteps(traj::AbstractTrajectory) = _NI("all_timesteps")
 get_timestep(traj::AbstractTrajectory, index::Integer) = _NI("get_timestep")
 length(traj::AbstractTrajectory) = _NI("length")
-add!(traj::AbstractTrajectory, s::AbstractSystem, timestep::Integer; reaction=false) = _NI("add!")
-add!(traj::AbstractTrajectory, s::AbstractTrajectory) = _NI("add!")
+add_snapshot!(traj::AbstractTrajectory, s::AbstractSystem; reaction=false) = _NI("add!")
+append!(traj::AbstractTrajectory, s::AbstractTrajectory) = _NI("add_snapshot!")
 import_dynamic!(reader::AbstractSystem, traj::AbstractTrajectory, index::Integer) = _NI("import_dynamic!")
 import_static!(reader::AbstractSystem, traj::AbstractTrajectory, index::Integer) = _NI("import_static!")
 latest_reaction(traj::AbstractTrajectory, index::Integer) = _NI("latest_reaction")
-similar(traj::AbstractTrajectory) = _NI("similar")
 similar_system(traj::AbstractTrajectory; reserve_dynamic::Bool=false, reserve_static::Bool=false) = _NI("similar_system")
 dimension(traj::AbstractTrajectory) = _NI("dimension")
 precision(traj::AbstractTrajectory) = _NI("precision")
@@ -140,7 +140,7 @@ prop(s::AbstractSystem, index::Integer, pname::AbstractString) = NI("prop")
 add_snapshot!(
     file_handler::AbstractFileFormat,
     s::AbstractSystem{D, F},
-    index::Integer,
+    index::Integer;
     reaction::Bool = false,
     unsafe::Bool = false
 ) where {D, F<:AbstractFloat} = _NI("add_snapshot!")

@@ -37,14 +37,13 @@ function hmdsave(
             print("progress: $(100*i÷nsnap)%    \r")
             add_snapshot!(
                 file_handler,
-                reader.snap,
-                i,
-                is_reaction(traj, i),
-                true
+                reader,
+                i;
+                reaction = is_reaction(traj, i),
+                unsafe = true
             )
         end
-        file["/timesteps"][1:length(traj),1] = [get_timestep(traj, i) for i in 1:nsnap]
-        file["/times"][1:length(traj),1] = [time(r.snap) for r in traj]
+        file["/times"][1:length(traj),1] = [time(r) for r in traj]
         println()
     finally
         close(file_handler)

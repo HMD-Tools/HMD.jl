@@ -66,7 +66,7 @@ end
 
 function count_label(s::System, hname::AbstractString, label_type::String)
     lh = hierarchy(s, hname)
-    labels = _label2node(lh) |> keys
+    labels = _label2node(lh) |> keys # uniqueness is guaranteed
     return count(l -> type(l)==label_type, labels)
 end
 
@@ -109,9 +109,9 @@ function insert_relation!(
     lh = hierarchy(s, hname)
 
     add_label!(s, hname, label)
+    _remove_relation!(lh, super, sub)
     add_relation!(s, hname; super=super, sub=label, unsafe=unsafe)
     add_relation!(s, hname; super=label, sub=sub, unsafe=unsafe)
-    _remove_relation!(lh, super, sub)
 
     return nothing
 end
@@ -194,4 +194,56 @@ end
 function sub(s::System, hname::AbstractString, label::HLabel)
     lh = hierarchy(s, hname)
     return _sub(lh, label)
+end
+
+function super_labels(s::System, hname::AbstractString, label::HLabel)
+    lh = hierarchy(s, hname)
+    labels = HLabel[]
+    current = _get_nodeid(lh, label)
+    while current == 0
+        push!(labels, _labels[current])
+        current = _super_id(lh, current)
+    end
+
+    return labels
+end
+
+function sub_labels(s::System, hname::AbstractString, label::HLabel)
+    lh = hierarchy(s, hname)
+    labels = HLabel[]
+    current = _get_nodeid(lh, label)
+    stack = collect(_sub_id(lh, current))
+
+    while !isempty(stack)
+        current = popfirst!(stack)
+        append!(stack, _sub_id(lh, current))
+        push!(labels, _labels(lh)[current])
+    end
+
+    return labels
+end
+
+function label2atom(s::System, hname::AbstractString, label::HLabel)
+    if isatom(label)
+        return [id(label)]
+    end
+
+    lh = hierarchy(s, hname)
+    labels = _labels(lh)
+    atoms = Int64[]
+
+    stack = [_get_nodeid(lh, label)]
+    while !isempty(stack)
+        current = popfirst!(stack)
+        for node_id in _sub_id(lh, current)
+            l = labels[node_id]
+            if isatom(l)
+                push!(atoms, id(l))
+            else
+                push!(stack, node_id)
+            end
+        end
+    end
+
+    return atoms
 end

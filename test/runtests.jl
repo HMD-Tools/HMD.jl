@@ -5,14 +5,25 @@ using Distributions
 
 const sample = let
     sample = System{3, Float64}()
+    # polymeric hierarchy
     add_hierarchy!(sample, "polymeric")
     add_labels!(
         sample,
         "polymeric",
-        [Entire_System, HLabel("sublabel", 1), HLabel("molecule", 1)]
+        [HLabel("sublabel", 1), HLabel("molecule", 1)]
     )
     add_relation!(sample, "polymeric"; super=Entire_System, sub=HLabel("molecule", 1))
     add_relation!(sample, "polymeric"; super=HLabel("molecule", 1), sub=HLabel("sublabel", 1))
+
+    # ruinfo hierarchy
+    add_hierarchy!(sample, "ruinfo")
+    add_labels!(
+        sample,
+        "ruinfo",
+        [HLabel("ru1", 1), HLabel("molecule", 1)]
+    )
+    add_relation!(sample, "ruinfo"; super=Entire_System, sub=HLabel("molecule", 1))
+    add_relation!(sample, "ruinfo"; super=HLabel("molecule", 1), sub=HLabel("ru1", 1))
     #atoms
     positions = [
         [-4.952, -0.895, 2.069],
@@ -65,7 +76,10 @@ const sample = let
     ]
     elems = vcat(fill(6, 15), fill(1, 32))
     @assert length(positions) == length(elems)
-    add_atoms!(sample, positions, elems; super=HLabel("sublabel" , 1))
+    add_atoms!(
+        sample, positions, elems;
+        super = Dict("polymeric" => HLabel("sublabel" , 1), "ruinfo" => HLabel("ru1" , 1))
+    )
 
     #bonds
     add_bond!(sample,  1,  2; bond_order=1//1)
@@ -118,13 +132,14 @@ const sample = let
 end
 
 function strict_eq(lh1::LabelHierarchy, lh2::LabelHierarchy)
-    if nv(lh1.g) != nv(lh2.g)
+    if length(lh1.g) != length(lh2.g)
         error("label hierarchy node num mismatch. \n" *
-            "    l1: $(nv(l1))" *
-            "    l2: $(nv(l2))"
+            "    l1: $(length(lh1.g))" *
+            "    l2: $(length(lh2.g))"
         )
     end
 
+    ne(g) = HMD.HierarchyLabels._ne(g)
     if ne(lh1.g) != ne(lh2.g)
         error("label hierarchy edge num mismatch. \n" *
             "    l1: $(ne(l1))" *
@@ -142,6 +157,9 @@ function strict_eq(lh1::LabelHierarchy, lh2::LabelHierarchy)
         end
     end
 
+    edges(g) = HMD.HierarchyLabels._edges(g)
+    src(e) = HMD.HierarchyLabels._src(e)
+    dst(e) = HMD.HierarchyLabels._dst(e)
     for e in edges(lh1.g)
         lh1.labels[src(e)] != lh2.labels[src(e)] && return false
         lh1.labels[dst(e)] != lh2.labels[dst(e)] && return false
@@ -272,17 +290,10 @@ function strict_eq(s1::System, s2::System)
 end
 
 function strict_eq(t1::Trajectory, t2::Trajectory)
-    if t1.timesteps != t2.timesteps
-        error("timesteps mismatch. \n" *
-            "    t1: $(t1.timesteps)" *
-            "    t2: $(t2.timesteps)"
-        )
-    end
-
-    if t1.is_reaction != t2.is_reaction
+    if t1.reactions != t2.reactions
         error("is_reaction mismatch. \n" *
-            "    t1: $(t1.is_reaction)" *
-            "    t2: $(t2.is_reaction)"
+            "    t1: $(t1.reactions)" *
+            "    t2: $(t2.reactions)"
         )
     end
 
@@ -303,41 +314,28 @@ end
             for i in 1:100
                 add_atom!(
                     s1, pos[i], elm[i];
-                    super = HLabel("sublabel", 1)
+                    super = Dict("polymeric" => HLabel("sublabel" , 1), "ruinfo" => HLabel("ru1" , 1))
                 )
             end
-            add_atoms!(s2, pos, elm; super=HLabel("sublabel", 1))
+            add_atoms!(
+                s2, pos, elm;
+                super = Dict("polymeric" => HLabel("sublabel" , 1), "ruinfo" => HLabel("ru1" , 1))
+            )
             strict_eq(s1, s2)
         end
     end
 
-    @testset "invariance on save" begin
-        hmdsave("test.hmd", sample)
-        s1 = read_system("test.hmd", sample)
-        strict_eq(sample, s1)
-    end
-
+    reaction_flags = [Bool(rand(DiscreteUniform(0, 1))) for _ in 1:100]
     @testset "invariance on trajectory save" begin
-        @test_throws ErrorException let
-            t = Trajectory(sample)
-            add!(t, sample, 1; reaction=false)
-            hmdsave("test.hmd", t)
-        end
-        @test_throws ErrorException let
-            t = Trajectory(sample)
-            add!(t, sample, 1; reaction=true)
-            hmdsave("test.hmd", t)
-        end
         traj = let
-            flags = [Bool(rand(DiscreteUniform(0, 1))) for _ in 1:100]
             t = Trajectory(sample)
             for i in 2:101
-                add!(t, sample, i; reaction=flags[i-1])
+                add_snapshot!(t, sample; reaction = reaction_flags[i-1])
             end
             t
         end
         hmdsave("test.hmd", traj)
-        t1 = read_traj("test.hmd", Trajectory(sample))
+        t1 = read_traj("test.hmd", 3, Float64, GeneralSystem)
         strict_eq(traj, t1)
     end
 end

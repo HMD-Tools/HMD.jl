@@ -1,5 +1,5 @@
 export Trajectory, SubTrajectory
-export all_timesteps, get_timestep, is_reaction, get_system
+export is_reaction, get_system
 export latest_reaction, add!
 export length
 
@@ -7,13 +7,13 @@ Base.@kwdef mutable struct Trajectory{D, F<:AbstractFloat, SysType<:AbstractSyst
     # Vector of System. Properties which does not changes at evety timestep are empty except for reactions.
     systems::Vector{System{D, F, SysType, L}} = System{D, F, SysType, L}[]
     # indices corresponding to reactions (not timestep!)
-    is_reaction::Vector{Int64} = Vector{Int64}(undef, 0)
+    reactions::Vector{Int64} = Vector{Int64}(undef, 0)
     # index -> timestep
-    timesteps::Vector{Int64} = Vector{Int64}(undef, 0)
+    #timesteps::Vector{Int64} = Vector{Int64}(undef, 0)
 end
 
 function Trajectory(s::System{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
-    return Trajectory{D, F, SysType, L}([s], [1], [1])
+    return Trajectory{D, F, SysType, L}([s], [1])
 end
 
 function Base.show(
@@ -29,21 +29,28 @@ function empty_trajectory(s::System{D, F, SysType, L}) where {D, F<:AbstractFloa
     return Trajectory{D, F, SysType, L}()
 end
 
+function empty_trajectory(
+    traj::Trajectory{D, F, SysType, L},
+    precision::Type{<:AbstractFloat} = F
+) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
+    return Trajectory{D, precision, SysType, L}()
+end
+
 function is_reaction(traj::Trajectory{D, F, SysType, L}, index::Integer) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
-    return index ∈ traj.is_reaction
+    return index ∈ traj.reactions
 end
 
 function get_system(traj::Trajectory{D, F, SysType, L}, index::Integer) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     return traj.systems[index]
 end
 
-function all_timesteps(traj::Trajectory{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
-    return traj.timesteps
-end
+#function all_timesteps(traj::Trajectory{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
+#    return traj.timesteps
+#end
 
-function get_timestep(traj::Trajectory{D, F, SysType, L}, index::Integer) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
-    return all_timesteps(traj)[index]
-end
+#function get_timestep(traj::Trajectory{D, F, SysType, L}, index::Integer) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
+#    return all_timesteps(traj)[index]
+#end
 
 function getindex(traj::AbstractTrajectory{D, F, SysType}, index::Integer) where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
     if !(0 < index <= length(traj))
@@ -84,7 +91,8 @@ function Base.iterate(traj::Trajectory{D, F, S, L}) where {D, F<:AbstractFloat, 
     import_dynamic!(reader, traj, index)
     import_static!(reader, traj, index)
 
-    return (step=get_timestep(traj, index), snap=reader), (index+1, reader)
+    #return (step=get_timestep(traj, index), snap=reader), (index+1, reader)
+    return reader, (index+1, reader)
 end
 
 function Base.iterate(
@@ -97,30 +105,34 @@ function Base.iterate(
         rp = latest_reaction(traj, index)
         import_static!(reader, traj, rp)
         import_dynamic!(reader, traj, index)
-        return (step=get_timestep(traj, index), snap=reader), (index+1, reader)
+        #return (step=get_timestep(traj, index), snap=reader), (index+1, reader)
+        return reader, (index+1, reader)
     else
         return nothing
     end
 end
 
-function add!(traj::Trajectory{D, F, SysType, L}, s::System{D, F, SysType, L}, timestep::Integer; reaction=false) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
-    @assert length(traj.systems) == length(traj.timesteps)
+function add_snapshot!(
+    traj::Trajectory{D, F, SysType, L},
+    s::System{D, F, SysType, L};
+    reaction = false
+) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     if length(traj) > 0
-        @assert traj.is_reaction[end] <= length(traj)
+        @assert traj.reactions[end] <= length(traj)
     else
         push!(traj.systems, s)
-        push!(traj.is_reaction, 1)
-        push!(traj.timesteps, timestep)
+        push!(traj.reactions, 1)
+        #push!(traj.timesteps, timestep)
         return nothing
     end
 
-    push!(traj.timesteps, timestep)
+    #push!(traj.timesteps, timestep)
     if reaction
         if nv(topology(s))==0 && isempty(all_elements(s)) # && isempty(hierarchy(s))
             error("system's topology, hierarchy, and elements are empty. ")
         end
         push!(traj.systems, s)
-        push!(traj.is_reaction, length(traj.systems))
+        push!(traj.reactions, length(traj.systems))
     else
         replica = System{D, F, SysType}()
         set_box!(replica, box(s))
@@ -134,23 +146,30 @@ function add!(traj::Trajectory{D, F, SysType, L}, s::System{D, F, SysType, L}, t
     return nothing
 end
 
-# TODO: implement add!(::SubTrajectory)
-function add!(
-    traj::Trajectory{D, F, SysType, L}, addend::Trajectory{D, F, SysType, L}
+# TODO: implement append!(::SubTrajectory)
+function append!(
+    traj::Trajectory{D, F, SysType, L},
+    addend::Trajectory{D, F, SysType, L};
+    include_head = false
 ) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     if topology(traj.systems[1]) != topology(addend.systems[1])
         error("topology of traj and addend are not compatible. ")
     end
 
-    endstep = all_timesteps(traj)[end]
-    nsnap = length(addend.systems)
-    append!(traj.systems, view(addend.systems, 2:nsnap))
-    append!(traj.is_reaction, addend.is_reaction[2:end])
-    append!(traj.timesteps, addend.timesteps[2:end] .+ endstep)
-
+    nsnap_orig = length(traj.systems)
     endtime = time(traj.systems[end])
-    for i in nsnap+1:length(traj)
-        traj.systems[i].time += endtime
+    if include_head
+        append!(traj.systems, addend.systems)
+        append!(traj.reactions, addend.reactions)
+        for i in (nsnap_orig+1) : length(traj.systems)
+            traj.systems[i].time += endtime
+        end
+    else
+        append!(traj.systems, @view addend.systems[2:end])
+        append!(traj.reactions, addend.reactions[2:end])
+        for i in (nsnap_orig+2) : length(traj.systems)
+            traj.systems[i].time += endtime
+        end
     end
 
     return nothing
@@ -181,21 +200,13 @@ function latest_reaction(traj::Trajectory{D, F, SysType, L}, index::Integer) whe
         error("index $index ∉ [1, $(length(traj))]")
     end
 
-    # find `i` s.t. traj.is_reaction[i] <= index < traj.is_reaction[i+1]
-    ii = searchsortedlast(traj.is_reaction, index)
-    return traj.is_reaction[ii]
+    # find `i` s.t. traj.reactions[i] <= index < traj.reactions[i+1]
+    ii = searchsortedlast(traj.reactions, index)
+    return traj.reactions[ii]
 end
 
-#function is_reaction(s::System)
-#    return all_elements(s) |> isempty
-#end
-
-function similar(
-    traj::Trajectory{D, F, SysType, L};
-    precision::Union{Type{<:AbstractFloat}, Nothing} = nothing
-) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
-    T = isnothing(precision) ? F : precision
-    return Trajectory{D, T, SysType, L}()
+function is_reaction(s::System)
+    return all_elements(s) |> isempty
 end
 
 function similar_system(
@@ -313,7 +324,8 @@ function Base.iterate(st::SubTrajectory{D, F, S, L, R}) where {D, F<:AbstractFlo
     rp = latest_reaction(st.traj, real_idx)
     import_static!(reader, st.traj, rp)
 
-    return (step=get_timestep(st.traj, real_idx), snap=reader), (pseude_idx+1, reader)
+    #return (step=get_timestep(st.traj, real_idx), snap=reader), (pseude_idx+1, reader)
+    return reader, (pseude_idx+1, reader)
 end
 
 function Base.iterate(
@@ -327,7 +339,8 @@ function Base.iterate(
         rp = latest_reaction(st.traj, real_idx)
         import_static!(reader, st.traj, rp)
         import_dynamic!(reader, st.traj, real_idx)
-        return (step=get_timestep(st.traj, real_idx), snap=reader), (pseude_idx+1, reader)
+        #return (step=get_timestep(st.traj, real_idx), snap=reader), (pseude_idx+1, reader)
+        return snap=reader, (pseude_idx+1, reader)
     else
         return nothing
     end
@@ -341,13 +354,13 @@ function get_system(st::SubTrajectory{D, F, S, L, R}, index::Integer) where {D, 
     return get_system(st.traj, st.traj_range[index])
 end
 
-function all_timesteps(st::SubTrajectory{D, F, S, L, R}) where {D, F<:AbstractFloat, S<:AbstractSystemType, L, R<:OrdinalRange}
-    return all_timesteps(st.traj)[st.traj_range]
-end
-
-function get_timestep(st::SubTrajectory{D, F, S, L, R}, index::Integer) where {D, F<:AbstractFloat, S<:AbstractSystemType, L, R<:OrdinalRange}
-    return get_timestep(st.traj, st.traj_range[index])
-end
+#function all_timesteps(st::SubTrajectory{D, F, S, L, R}) where {D, F<:AbstractFloat, S<:AbstractSystemType, L, R<:OrdinalRange}
+#    return all_timesteps(st.traj)[st.traj_range]
+#end
+#
+#function get_timestep(st::SubTrajectory{D, F, S, L, R}, index::Integer) where {D, F<:AbstractFloat, S<:AbstractSystemType, L, R<:OrdinalRange}
+#    return get_timestep(st.traj, st.traj_range[index])
+#end
 
 function Base.length(st::SubTrajectory{D, F, S, L, R}) where {D, F<:AbstractFloat, S<:AbstractSystemType, L, R<:OrdinalRange}
     return length(st.traj_range)
@@ -362,7 +375,7 @@ function latest_reaction(st::SubTrajectory{D, F, S, L, R}, index::Integer) where
         error("index $index ∉ $(st.traj_range)")
     end
 
-    # find `i` s.t. traj.is_reaction[i] <= index < traj.is_reaction[i+1]
-    ii = searchsortedlast(st.traj.is_reaction, index)
-    return st.traj.is_reaction[ii]
+    # find `i` s.t. traj.reactions[i] <= index < traj.reactions[i+1]
+    ii = searchsortedlast(st.traj.reactions, index)
+    return st.traj.reactions[ii]
 end

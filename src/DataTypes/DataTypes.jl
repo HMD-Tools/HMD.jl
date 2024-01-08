@@ -24,7 +24,7 @@ using ..HierarchyLabels
 
 @reexport import Base: *, +, -, /, <, <=, ==, >, >=, close, contains, convert, getindex,firstindex, lastindex, iterate,
     length, position, precision, promote_rule, promote_type, setproperty!, show, similar,
-    string, time, ∈, ∉, merge!, println
+    string, time, ∈, ∉, merge!, println, append!
 
 @reexport import ..HMD: deserialize, serialize
 @reexport import ..HMD:
@@ -110,7 +110,6 @@ using ..HierarchyLabels
     all_timesteps,
     get_timestep,
     length,
-    add!,
     import_dynamic!,
     import_static!,
     latest_reaction,
@@ -138,6 +137,9 @@ export Position, BoundingBox, HLabel, LabelHierarchy
 
 # core immut signature
 export GeneralSystem, System, print_to_string
+
+# optimized functions
+export super_labels, sub_labels
 
 # fileIO
 export H5traj, SerializedTopology, PackedHierarchy
@@ -541,33 +543,7 @@ Math equation is calculated by the below code with Symbolics.jl
     return SVector{3, F}(α, β, γ)
 end
 
-function label2atom(s::System, hname::AbstractString, label::HLabel)
-    lh = hierarchy(s, hname)
-    labels = _labels(lh)
-    atom_ids = Int64[]
-
-    stack = [_get_nodeid(lh, label)]
-    if is_atom(labels[stack[1]])
-        return [stack[1]]
-    end
-
-    while !isempty(stack)
-        current_node = popfirst!(stack)
-        next_nodes = _sub_id(lh, current_node)
-        for node in next_nodes
-            label = labels[node]
-            if is_atom(label)
-                push!(atom_ids, id(label))
-            else
-                pushfirst!(stack, node)
-            end
-        end
-    end
-
-    return atom_ids
-end
-
-function is_atom(label::HLabel)
+function isatom(label::HLabel)
     return type(label) == ""
 end
 

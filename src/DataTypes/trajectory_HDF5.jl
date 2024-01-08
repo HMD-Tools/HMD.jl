@@ -100,7 +100,6 @@ structure:
     system_type
     1d props
         times
-        timesteps
         name1
         name2
     position
@@ -161,13 +160,6 @@ function h5traj(
         dataspace(traj_length, 1);
         chunk = (traj_length, 1)
     )
-    create_dataset(
-        file,
-        "timesteps",
-        datatype(Int64),
-        dataspace(traj_length, 1);
-        chunk = (traj_length, 1)
-    )
 
     # make chunks for each step for atomic & dynamic properties
     # chunk size is min(datasize, 16MB)
@@ -218,7 +210,7 @@ end
 function add_snapshot!(
     file_handler::H5traj,
     s::System{D, F, SysType, L},
-    index::Integer,
+    index::Integer;
     reaction::Bool = false,
     unsafe::Bool = false
 ) where{D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
@@ -322,7 +314,6 @@ end
 struct H5trajReader{F<:AbstractFloat}
     file::HDF5.File
     times::Vector{F}
-    timesteps::Vector{Int64}
     elems::Vector{Atomic_Number_Precision}
     reactions::Vector{Int64}
     boxes::SerializedBoxes{F}
@@ -342,10 +333,10 @@ function h5traj_reader(name::AbstractString, F::Type{<:AbstractFloat})
         x::Matrix{F} = read(file, "times")
         reshape(x, length(x))
     end
-    timesteps = let
-        x::Matrix{Int64} = read(file, "timesteps")
-        reshape(x, length(x))
-    end
+    #timesteps = let
+    #    x::Matrix{Int64} = read(file, "timesteps")
+    #    reshape(x, length(x))
+    #end
     elems::Vector{Atomic_Number_Precision} = read(file, "elements")
     reactions::Vector{Int64} = let
         entries::Base.KeySet{String, Dict{String, Any}} = keys(read(file, "topology"))
@@ -356,7 +347,7 @@ function h5traj_reader(name::AbstractString, F::Type{<:AbstractFloat})
         axis::Matrix{F} = read(file, "box_axis")
         SerializedBoxes(origin, axis)
     end
-    Nsnap = length(timesteps)
+    Nsnap = length(times)
     Natom::Int64 = read(file, "natom")
     has_v = haskey(file, "velocity")
     has_f = haskey(file, "force")
@@ -375,10 +366,10 @@ function h5traj_reader(name::AbstractString, F::Type{<:AbstractFloat})
         end
     end
 
-    @assert length(timesteps) == length(times)
+    #@assert length(timesteps) == length(times)
     @assert length(reactions) <= length(times)
 
-    return H5trajReader{F}(file, times, timesteps, elems, reactions, boxes, Nsnap, Natom, has_v, has_f, hnames, atomprops)
+    return H5trajReader{F}(file, times, elems, reactions, boxes, Nsnap, Natom, has_v, has_f, hnames, atomprops)
 end
 
 function read_traj(
@@ -400,8 +391,8 @@ function read_traj!(
     traj::Trajectory{D, F, S, L},
     hmdfile::H5trajReader{F}
 ) where {D, F<:AbstractFloat, S<:AbstractSystemType, L}
-    traj.timesteps = hmdfile.timesteps
-    traj.is_reaction = hmdfile.reactions
+    #traj.timesteps = hmdfile.timesteps
+    traj.reactions = hmdfile.reactions
     traj.systems = [similar_system(traj) for _ in 1:hmdfile.Nsnap]
     # dynamic properties
     for i in 1:hmdfile.Nsnap
@@ -419,13 +410,12 @@ function read_traj!(
         end
     end
     # static properties
-    for (i, rp) in enumerate(hmdfile.reactions)
-        traj.systems[rp].topology = _read_topology(hmdfile.file, i)
+    for rp in hmdfile.reactions
+        traj.systems[rp].topology = _read_topology(hmdfile.file, rp)
         for hname in hmdfile.hnames
-            traj.systems[rp].hierarchy[hname] = _read_hierarchy(hmdfile.file, hname, i)
+            traj.systems[rp].hierarchy[hname] = _read_hierarchy(hmdfile.file, hname, rp)
         end
         traj.systems[rp].element = hmdfile.elems
-        @assert traj.is_reaction[i] == hmdfile.reactions[i]
     end
     println()
 

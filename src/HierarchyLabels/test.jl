@@ -7,11 +7,11 @@ function test()
     noexist    = HLabel("not_exist_in_h", -1)
     handmade = let
         lh = LabelHierarchy()
-        @assert add_vertex!(_hierarchy(lh)); push!(lh.labels, l1); push!(lh.label2node, l1 => 1)
-        @assert add_vertex!(_hierarchy(lh)); push!(lh.labels, l2); push!(lh.label2node, l2 => 2)
-        @assert add_vertex!(_hierarchy(lh)); push!(lh.labels, l3); push!(lh.label2node, l3 => 3)
-        add_edge!(_hierarchy(lh), 2, 1)
-        add_edge!(_hierarchy(lh), 3, 2)
+        @assert _add_nodes!(lh.g, 1); push!(lh.labels, l1); push!(lh.label2node, l1 => 1)
+        @assert _add_nodes!(lh.g, 1); push!(lh.labels, l2); push!(lh.label2node, l2 => 2)
+        @assert _add_nodes!(lh.g, 1); push!(lh.labels, l3); push!(lh.label2node, l3 => 3)
+        _add_edge!(lh.g, 1, 2)
+        _add_edge!(lh.g, 2, 3)
         lh
     end
 
@@ -48,7 +48,7 @@ function test()
     @test _contains(addrel1, l1)
     @test !_contains(addrel1, noexist)
     @test _get_nodeid(addrel1, l1) == 1 && _get_nodeid(addrel1, l2) == 2 && _get_nodeid(addrel1, l3) == 3
-    @test _super(addrel1, l3) == [l2] && _super(addrel1, l2) == [l1]
+    @test _super(addrel1, l3) == l2 && _super(addrel1, l2) == l1
     @test _sub(addrel1, l1)   == [l2] && _sub(addrel1, l2)   == [l3]
     @test _issuper(addrel1, l1, l2) && _issuper(addrel1, l2, l3)
     @test _issub(addrel1, l2, l1)   && _issub(addrel1, l3, l2)
@@ -56,7 +56,6 @@ function test()
     @inferred _contains(addrel1, l1)
     @inferred _get_nodeid(addrel1, l1)
     @inferred _sub(addrel1, l1)
-    @inferred _super(addrel1, l3)
     @inferred _issuper(addrel1, l1, l2)
     @inferred _issub(addrel1, l2, l1)
 
@@ -75,7 +74,7 @@ function test()
     # add_labels!() duplication detection
     let
         lh = LabelHierarchy()
-        @test _add_labels!(lh, [l1, l2, l2]) == Label_Occupied
+        @test_throws ErrorException _add_labels!(lh, [l1, l2, l2])
     end
 
     # cycle detection in LabelHierarchy graph

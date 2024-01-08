@@ -10,7 +10,7 @@ using LinearAlgebra
 using StaticArrays
 @reexport using Unitful
 
-@reexport import Base: getindex, firstindex, lastindex, setproperty!, iterate, length, precision, close, string, show, showerror
+@reexport import Base: getindex, firstindex, lastindex, setproperty!, iterate, length, precision, close, string, show, showerror, append!
 @reexport import Base: >, <, >=, <=, +, -, *, /, ==, position
 @reexport import Base: time, contains, promote_type, promote_rule, similar, merge!
 @reexport import Graphs: neighbors

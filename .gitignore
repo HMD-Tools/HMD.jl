@@ -1,3 +1,4 @@
 /docs/build/
 HMD.code-workspace
 Manifest.toml
+*.hmd
