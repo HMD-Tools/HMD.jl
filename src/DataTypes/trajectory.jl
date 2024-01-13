@@ -19,9 +19,11 @@ end
 function Base.show(
     io::IO, ::MIME"text/plain", traj::Trajectory{D, F, S, L}
 ) where {D, F<:AbstractFloat, S<:AbstractSystemType, L}
+    initial = @sprintf "%0.3e" time(traj.systems[1])
+    final = @sprintf "%0.3e" time(traj.systems[end])
     "Trajectory{$D, $F, $S, $L}
         length: $(length(traj))
-        time: $(time(traj.systems[1])) to $(time(traj.systems[end]))
+        time: $(initial) to $(final))
     " |> println
 end
 

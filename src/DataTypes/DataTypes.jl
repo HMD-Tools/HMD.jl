@@ -15,6 +15,7 @@ using HDF5
 using LinearAlgebra
 using MLStyle
 using PeriodicTable
+using Printf
 using Reexport
 using SimpleWeightedGraphs
 using StaticArrays
