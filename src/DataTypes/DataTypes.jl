@@ -22,6 +22,7 @@ using StaticArrays
 using Unitful
 
 using ..HierarchyLabels
+using ..TopologyGraphs
 
 @reexport import Base: *, +, -, /, <, <=, ==, >, >=, close, contains, convert, getindex,firstindex, lastindex, iterate,
     length, position, precision, promote_rule, promote_type, setproperty!, show, similar,
@@ -167,7 +168,8 @@ struct GeneralSystem <: AbstractSystemType end
 
 mutable struct System{D, F<:AbstractFloat, S<:AbstractSystemType, L} <: AbstractSystem{D, F, S}
     time::F
-    topology::SimpleWeightedGraph{Int64, Rational{BO_Precision}}
+    #topology::SimpleWeightedGraph{Int64, Rational{BO_Precision}}
+    topology::TopologyGraph{Int64, Rational{BO_Precision}}
     box::BoundingBox{D, F, L}
 
     # atom property
@@ -186,7 +188,8 @@ end
 function System{D, F, SysType}() where {D, F<:AbstractFloat, SysType<:AbstractSystemType}
     System{D, F, SysType, D*D}(
         zero(F),
-        SimpleWeightedGraph{Int64, Rational{BO_Precision}}(),
+        #SimpleWeightedGraph{Int64, Rational{BO_Precision}}(),
+        TopologyGraph{Int64, Rational{BO_Precision}}(),
         BoundingBox{D, F}(),
         Position{D, F}(),
         Vector{SVector{D, Int16}}(undef, 0),

@@ -31,7 +31,7 @@ struct SerializedTopology
     numerator::Vector{BO_Precision}
 end
 
-function serialize(topo::SimpleWeightedGraph)
+function serialize(topo::AbstractSimpleWeightedGraph)
     num_node = nv(topo)
     edges_org = Vector{Int64}(undef, ne(topo))
     edges_dst = Vector{Int64}(undef, ne(topo))
@@ -48,11 +48,15 @@ function serialize(topo::SimpleWeightedGraph)
 end
 
 function deserialize(ser_topo::SerializedTopology)
-    topo = SimpleWeightedGraph{Int64, Rational{BO_Precision}}()
+    #topo = SimpleWeightedGraph{Int64, Rational{BO_Precision}}()
+    topo = TopologyGraph{Int64, Rational{BO_Precision}}()
     add_vertices!(topo, ser_topo.num_node)
     for i in 1:length(ser_topo.edges_org)
-        add_edge!(topo, ser_topo.edges_org[i], ser_topo.edges_dst[i], Rational{BO_Precision}(ser_topo.numerator[i], ser_topo.denominator[i]))
-        #add_edge!(topo, ser_topo.edges_org[i], ser_topo.edges_dst[i], ser_topo.numerator[i]//ser_topo.denominator[i])
+        add_edge!(
+            topo, ser_topo.edges_org[i],
+            ser_topo.edges_dst[i],
+            Rational{BO_Precision}(ser_topo.numerator[i], ser_topo.denominator[i])
+        )
     end
 
     return topo

@@ -1,7 +1,8 @@
 module HierarchyLabels
 
-using Graphs
+#using Graphs
 using MLStyle
+using Random
 using Reexport
 using StaticArrays
 
@@ -174,6 +175,7 @@ function _add_edge!(nodes::_Nodes, super::Integer, sub::Integer)
         return false
     end
 
+    @assert sub ∉ nodes.sub[super]
     push!(nodes.sub[super], sub)
     nodes.super[sub] = super
 
@@ -189,7 +191,6 @@ end
 
 function _rem_edge!(nodes::_Nodes, super::Integer, sub::Integer)
     if super == sub
-        println("\n==\n")
         return false
     end
     if sub ∉ nodes.sub[super] # edge does not exist
@@ -197,7 +198,6 @@ function _rem_edge!(nodes::_Nodes, super::Integer, sub::Integer)
         return false
     end
     if nodes.super[sub] == 0 # edge does not exist
-        println("\nsuper\n")
         return false
     end
 

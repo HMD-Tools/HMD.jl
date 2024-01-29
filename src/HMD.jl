@@ -2,13 +2,15 @@ module HMD
 
 using Reexport
 
+using DataStructures
 @reexport using Graphs
 using HDF5
 using LinearAlgebra
-@reexport using PeriodicTable
+using PeriodicTable
 @reexport using SimpleWeightedGraphs
 using StaticArrays
-@reexport using Unitful
+using Unitful
+
 
 @reexport import Base: getindex, firstindex, lastindex, setproperty!, iterate, length, precision, close, string, show, showerror, append!
 @reexport import Base: >, <, >=, <=, +, -, *, /, ==, position
@@ -153,13 +155,15 @@ export
     read_traj,
     snapshot
 
-include("util.jl")
 
+include("TopologyGraphs/TopologyGraphs.jl")
+@reexport using .TopologyGraphs
+
+include("util.jl")
 include("HierarchyLabels/HierarchyLabels.jl")
 using .HierarchyLabels
 
 include("interface/interface.jl")
-
 include("DataTypes/DataTypes.jl")
 @reexport using .DataTypes
 

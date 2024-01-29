@@ -1,7 +1,7 @@
 using HMD
 using Test
 using Distributions
-
+using Random
 
 const sample = let
     sample = System{3, Float64}()
@@ -305,6 +305,7 @@ function strict_eq(t1::Trajectory, t2::Trajectory)
 end
 
 @testset "HMD.jl" begin
+    HMD.TopologyGraphs.test()
     HMD.DataTypes.HierarchyLabels.test()
     @testset "atom addition" begin
         @testset "add_label()-add_labels() equality" begin

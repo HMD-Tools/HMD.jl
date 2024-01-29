@@ -1,5 +1,30 @@
 using Test
 
+function _random_tree(ndepth, maxwidth, rng)
+    Entire_System = HLabel("Entire_System", 0)
+
+    lh = LabelHierarchy()
+    _add_label!(lh, Entire_System)
+
+    last_labels = [Entire_System]
+    for i in 2:ndepth
+        next_labels = shuffle!(
+            [HLabel(randstring(rng, rand(1:20)), i) for i in 1:rand(rng, 1:maxwidth)]
+        )
+        _add_labels!(lh, next_labels)
+        for label in next_labels
+            _add_relation!(
+                lh;
+                super = rand(rng, last_labels),
+                sub = label
+            )
+        end
+        last_labels = next_labels
+    end
+
+    return lh
+end
+
 function test()
 
 @testset "HierarchyHLabels" begin
