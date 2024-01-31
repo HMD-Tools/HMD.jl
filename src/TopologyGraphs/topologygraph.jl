@@ -392,11 +392,18 @@ function SimpleWeightedGraphs.induced_subgraph(
     elist = Vector{TopologyEdge{T, U}}()
     for v in vlist
         for nbr in _neighbors(g, v)
-            !insorted(nbr, node_mapping) || continue
+            !insorted(nbr, node_mapping) && continue
             v ≤ nbr && push!(elist, TopologyEdge{T, U}(v, nbr, get_weight(g, v, nbr)))
         end
     end
-    sort!(elist; by=dst)
+    sort!(
+        elist;
+        lt = (e1, e2) -> if src(e1) != src(e2)
+            src(e1) < src(e2)
+        else
+            dst(e1) < dst(e2)
+        end
+    )
     @assert issorted(elist; by=src)
     @assert allunique(elist)
 
@@ -437,7 +444,11 @@ function _induced_subgraph(
     sg = TopologyGraph{T, U}()
     add_vertices!(sg, length(node_mapping))
     for e in elist
-        add_edge!(sg, e)
+        s = searchsortedfirst(node_mapping, src(e))
+        d = searchsortedfirst(node_mapping, dst(e))
+        @assert add_edge!(sg, s, d, weight(e))
+        @assert node_mapping[s] == src(e)
+        @assert node_mapping[d] == dst(e)
     end
 
     return sg, node_mapping

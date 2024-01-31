@@ -133,41 +133,52 @@ for _ in 1:1
         v = rand(rng, 1:nv(topo))
         td = dijkstra_shortest_paths(topo, v)
         wd = dijkstra_shortest_paths(wg, v)
-        # dijkstra_shortest_paths(topo, v)
-        # dijkstra_shortest_paths(wg, v)
-        #@test td == wd
         for fname in fieldnames(typeof(td))
             @test getfield(td, fname) == getfield(wd, fname)
         end
     end
-    @testset "bfs_shortestpath_path" begin
-        _path = TopologyGraph{Int64, Rational{Int8}}()
-        add_vertices!(_path, 10)
-        for i in 1:nv(_path)-1
-            add_edge!(_path, i, i+1, rand(rng, (1//1, 2//1, 3//1, 3//2)))
-        end
-        result = bfs_shortestpath(_path, 1, 10)
-        oracle = let
-            elist = a_star(path_graph(10), 1, 10)
-            push!([src(e) for e in elist], dst(elist[end]))
-        end
-        println(result)
-        println(oracle)
-        @test result == oracle
-    end
-    return nothing
     @testset "induced_subgraph" begin
         a, b = let
             a = rand(rng, 1:nv(topo))
             b = rand(rng, 1:nv(topo))
             extrema((a, b))
         end
-        st = induced_subgraph(topo, a:b)
-        sw = induced_subgraph(wg, a:b)
-        return nothing
+        st, tmap = induced_subgraph(topo, a:b)
+        sw, wmap = induced_subgraph(wg, a:b)
+        @test tmap == wmap
+        @test strict_eq(st, sw)
     end
 
+end # for loop
+
+rng = Xoshiro(1)
+@testset "bfs_shortestpath_path" begin
+    _path = TopologyGraph{Int64, Rational{Int8}}()
+    add_vertices!(_path, 10)
+    for i in 1:nv(_path)-1
+        add_edge!(_path, i, i+1, rand(rng, (1//1, 2//1, 3//1, 3//2)))
+    end
+    result = bfs_shortestpath(_path, 1, 10)
+    oracle = let
+        elist = a_star(path_graph(10), 1, 10)
+        push!([src(e) for e in elist], dst(elist[end]))
+    end
+    @test result == oracle
 end
+
+@testset "cycle detection" begin
+    wg = SimpleWeightedGraph{Int64, Rational{Int8}}(complete_graph(100))
+    topo = let
+        g = TopologyGraph{Int64, Rational{Int8}}()
+        for e in edges(wg)
+            add_edge!(g, Tuple(e))
+        end
+    end
+    @test has_cycle(topo) == has_cycle(wg)
+    simplecycles_limited_length(topo, 10)
+    simplecycles_limited_length(wg, 10)
+end
+
 
 end # testset
 
