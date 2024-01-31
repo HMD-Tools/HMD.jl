@@ -36,7 +36,7 @@ function strict_eq(topo, wg)
     return true
 end
 
-for _ in 1:1
+for _ in 1:5
     topo, wg = random_graph(500, 6, Xoshiro(1))
     @test all(v -> allunique(inneighbors(topo, v)), vertices(topo))
     @test all(v -> issorted(inneighbors(topo, v)), vertices(topo))
@@ -167,16 +167,21 @@ rng = Xoshiro(1)
 end
 
 @testset "cycle detection" begin
-    wg = SimpleWeightedGraph{Int64, Rational{Int8}}(complete_graph(100))
+    wg = SimpleWeightedGraph{Int64, Rational{Int8}}(complete_graph(30))
     topo = let
         g = TopologyGraph{Int64, Rational{Int8}}()
+        add_vertices!(g, nv(wg))
         for e in edges(wg)
-            add_edge!(g, Tuple(e))
+            add_edge!(g, src(e), dst(e), weight(e))
         end
+        g
     end
-    @test has_cycle(topo) == has_cycle(wg)
-    simplecycles_limited_length(topo, 10)
-    simplecycles_limited_length(wg, 10)
+    @assert strict_eq(topo, wg)
+    @test is_cyclic(topo) == is_cyclic(wg)
+    tc = simplecycles_limited_length(topo, 10)
+    wc = simplecycles_limited_length(wg, 10)
+    @test length(tc) == length(wc)
+    @test tc == wc
 end
 
 
