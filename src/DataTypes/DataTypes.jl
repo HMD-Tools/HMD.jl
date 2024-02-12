@@ -26,7 +26,7 @@ using ..TopologyGraphs
 
 @reexport import Base: *, +, -, /, <, <=, ==, >, >=, close, contains, convert, getindex,firstindex, lastindex, iterate,
     length, position, precision, promote_rule, promote_type, setproperty!, show, similar,
-    string, time, ∈, ∉, merge!, println, append!
+    string, time, ∈, ∉, merge!, println, append!, replace!
 
 @reexport import ..HMD: deserialize, serialize
 @reexport import ..HMD:
@@ -247,8 +247,7 @@ end
 
 function natom(s::System)
     natm = length(s.position)
-    #@assert natm == length(s.element)
-    return length(s.position)
+    return natm
 end
 
 function nbond(s::System)

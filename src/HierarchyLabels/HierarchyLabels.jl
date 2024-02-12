@@ -11,7 +11,7 @@ using StaticArrays
 
 export HLabel, id, type
 export LabelResult, Label_Missing, Label_Occupied, Label_Duplication, Relation_Missing, Relation_Occupied, Success
-export  LabelHierarchy, _labels, _add_label!, _add_labels!, _add_relation!, _remove_label!, _remove_relation!
+export  LabelHierarchy, _labels, _add_label!, _replace!, _add_labels!, _add_relation!, _remove_label!, _remove_relation!
 export _label_unique, _label_nocycle, _label_connected
 export _label2node, _contains, ∈, ∋, ∉, _has_relation ,_get_nodeid, getindex
 export _issuper, _issub, _super_id, _sub_id, _super, _sub
@@ -123,7 +123,6 @@ function Base.println(lh::LabelHierarchy)
     subtree(lh, label, level, indent) = begin
         label == _root(lh) && println("$label")
         labels = _sub(lh, label)
-        nlines = length(labels)
         for (i, s) in enumerate(labels)
             bc = if _has_relation(lh, label, s)
                 i == length(labels) ? "└" : "├"
@@ -131,14 +130,9 @@ function Base.println(lh::LabelHierarchy)
                 " "
             end
             str = join(fill(" ", level * indent)) * bc * "$s\n"
-            if degree(_nodes(lh), _get_nodeid(lh, s)) == 0
-                printstyled(str; color=:red)
-            else
-                print(str)
-            end
+            print(str)
             subtree(lh, s, level + 1, indent)
         end
-        #nlines
     end
     subtree(lh, _root(lh), 1, 4)
 end
@@ -251,13 +245,23 @@ function _get_label(lh::LabelHierarchy, id::Integer)
     return _labels(lh)[id]
 end
 
-function _set_label!(lh::LabelHierarchy, label::HLabel, id::Integer)
-    if !_contains(lh, label)
+# replaceの方がよい？
+function _replace!(lh::LabelHierarchy, p::Pair{HLabel, HLabel})
+    if p[1] == p[2]
+        return Label_Duplication
+    elseif !_contains(lh, p[1])
         return Label_Missing
+    elseif _contains(lh, p[2])
+        return Label_Occupied
     end
 
-    _labels(lh)[id] = label
-    _label2node(lh)[label] = id
+    id = _get_nodeid(lh, p[1])
+    @assert _labels(lh)[id] == p[1]
+    @assert _label2node(lh)[p[1]] == id
+
+    _labels(lh)[id] = p[2]
+    delete!(_label2node(lh), p[1])
+    _label2node(lh)[p[2]] = id
 
     return Success
 end
@@ -379,8 +383,9 @@ function _remove_relation!(lh::LabelHierarchy, label1::HLabel, label2::HLabel)
 end
 
 function _label_unique(lh::LabelHierarchy)
+    # check if data is broken and uniqueness
     @assert _label2node(lh) |> values |> allunique
-    return allunique(_labels(lh))
+    return allunique(_labels(lh)) && length(_label2node(lh)) == length(_labels(lh)) == _nv(lh)
 end
 
 function _label_nocycle(lh::LabelHierarchy)
@@ -492,6 +497,7 @@ function _root(lh::LabelHierarchy)
 end
 
 
+
 function _merge_hierarchy!(
     augend::LabelHierarchy,
     addend::LabelHierarchy;
@@ -516,20 +522,48 @@ function _merge_hierarchy!(
         node_mapping[id] = id + forward_shift - back_shift
     end
 
+    # if augend and addend has the same labels, the id in labels in addend are updated
+    # such that: old id => maximum(id in augend) + 1
+    oldnew = Dict{HLabel, HLabel}()
+    maxid_augend = Dict{String, Int64}() # maximum id of label type in augend
+    for label in _labels(addend)
+        _label2node(addend)[label] ∈ exception && continue
+        ltype = type(label)
+        if label ∉ augend && label ∉ values(oldnew)
+            oldnew[label] = label
+        else
+            if !haskey(maxid_augend, ltype)
+                maxid_augend[ltype] = maximum(
+                    id(l) for l in _labels(augend) if type(l) == ltype;
+                    init = 0
+                )
+            end
+            maxid = max(
+                maxid_augend[ltype],
+                maximum(id(l) for l in values(oldnew) if type(l) == ltype; init=0)
+            )
+            @assert maxid < typemax(Int64)
+            @assert !haskey(oldnew, label)
+            @assert HLabel(ltype, maxid+1) ∉ augend
+            oldnew[label] = HLabel(ltype, maxid+1)
+        end
+    end
+    @assert allunique(values(oldnew))
+
     # augendに既に存在するラベル数を記録
     # augendになくaddendにあるラベルのcounterは0
-    counter = Dict{String, Int64}() #
-    for label in _labels(augend)
-        if !haskey(counter, type(label))
-            counter[type(label)] = 0
-        end
-        counter[type(label)] += 1
-    end
-    for label in _labels(addend)
-        if !haskey(counter, type(label))
-            counter[type(label)] = 0
-        end
-    end
+    #counter = Dict{String, Int64}() #
+    #for label in _labels(augend)
+    #    if !haskey(counter, type(label))
+    #        counter[type(label)] = 0
+    #    end
+    #    counter[type(label)] += 1
+    #end
+    #for label in _labels(addend)
+    #    if !haskey(counter, type(label))
+    #        counter[type(label)] = 0
+    #    end
+    #end
 
     # merge vertices and labels
     g_augend, g_addend = _nodes(augend), _nodes(addend)
@@ -554,17 +588,25 @@ function _merge_hierarchy!(
         )
     end
 
-    # label
-    for (old_id, new_id) in sort(collect(pairs(node_mapping)), by=x->x[2])
-        ltype = _get_label(addend, old_id) |> type
-        counter[ltype] += 1
-        _labels(augend)[new_id] = HLabel(ltype, counter[ltype])
-        push!(_label2node(augend), HLabel(ltype, counter[ltype]) => new_id)
+    # adding labels to augend
+    for (old_id, new_id) in pairs(node_mapping)
+        label_addend = _labels(addend)[old_id] # original label in addend (not changed at all!)
+        label_augend = oldnew[label_addend]    # label to be added to augend
+        @assert label_augend ∉ augend
+        _labels(augend)[new_id] = label_augend
+        push!(_label2node(augend), label_augend => new_id)
     end
+    @assert length(_label2node(augend)) == length(_labels(augend)) == _nv(augend)
+    @assert _label_nocycle(augend) # O(1) cost
+    #for (old_id, new_id) in sort(collect(pairs(node_mapping)), by=x->x[2])
+    #    ltype = _get_label(addend, old_id) |> type
+    #    counter[ltype] += 1
+    #    _labels(augend)[new_id] = HLabel(ltype, counter[ltype])
+    #    push!(_label2node(augend), HLabel(ltype, counter[ltype]) => new_id)
+    #end
 
-    if !unsafe
+    if !unsafe # checks of O(n) cost
         _label_unique(augend) || error("label is not unique. ")
-        _label_nocycle(augend) || error("label hierarchy has cycle. ")
         _label_connected(augend) || error("isolated label found. ")
     end
 

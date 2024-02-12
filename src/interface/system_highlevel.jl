@@ -13,6 +13,10 @@ const Entire_System = HLabel("entire_system", 1)
 #    elements[:Cl].symbol => 35.453
 #)
 
+function natom(s::AbstractSystem, hname::AbstractString, label::HLabel)
+    return length(all_labels(s, hname, label))
+end
+
 function add_atom!(
     s::AbstractSystem,
     x::AbstractVector{<:AbstractFloat},

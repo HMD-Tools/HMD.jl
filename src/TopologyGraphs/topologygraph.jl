@@ -507,6 +507,152 @@ function SimpleWeightedGraphs.connected_components(
     return ccs
 end
 
+function bfs_shortestpath(
+    g::TopologyGraph{T, U},
+    start::Integer,
+    finish::Integer,
+    area::AbstractVector{T1} = vertices(g)
+) where {T<:Integer, U<:Real, T1<:Integer}
+    return bfs_shortestpath(g, start, [finish], area)
+end
+
+function bfs_shortestpath(
+    g::TopologyGraph{T, U},
+    start::Integer,
+    finish::AbstractVector{T1},
+    area::AbstractVector{T2} = vertices(g)
+) where {T<:Integer, U<:Real, T1 <:Integer, T2 <:Integer} # -> path::Vector{Vector{T}}
+    if isempty(finish)
+        error("empty target atoms ")
+    elseif isempty(area)
+        error("empty area. ")
+    elseif !has_vertex(g, start)
+        error("start node $start is out of range. ")
+    elseif !_unique_and_sorted(area)
+        error("area must be unique and sorted. ")
+    elseif !_unique_and_sorted(finish)
+        error("target atoms for shortest path must be unique and sorted. ")
+    elseif !_issubset_sorted(area, vertices(g))
+        error("area must be a subset of vertices.")
+    elseif !_issubset_sorted(finish, area)
+        error("target atoms for shortest path must be a subset of area.")
+    elseif (length(finish)==1 && start == finish[1]) || nv(g) == 1
+        return [[T(start)]]
+    end
+
+    path = Vector{Vector{T}}()
+
+    buffer = T[start]
+    visited = Set{T}(start)
+    elist = Vector{Tuple{T, T}}()
+    while !isempty(buffer) && length(path) ≤ length(finish)
+        v = popfirst!(buffer)
+        for nbr in _neighbors(g, v)
+            if nbr ∉ visited
+                push!(buffer, nbr)
+                push!(elist, (v, nbr))
+                # visited is extended here, so edges in elist never merges
+                push!(visited, nbr)
+                insorted(nbr, finish) && push!(path, _path(elist, start, nbr))
+            end
+        end
+    end
+
+    # if start ∈ finish, the path [start] is not added in the BFS search above
+    i = searchsortedfirst(finish, start)
+    if finish[i] == start # equal to (start ∈ finish)
+        insert!(path, i, [start])
+    end
+
+    return path
+end
+
+# elist backtracking
+function _path(elist::AbstractVector{Tuple{T,T}}, start::Integer, finish::Integer) where {T<:Integer}
+    @assert elist[end][2] == finish
+
+    path = T[elist[end][2]]
+    current = lastindex(elist)
+    head, tail = elist[current]
+    while head != start
+        @assert head != tail
+        pushfirst!(path, head)
+        # 呼び出し元のBFSに伴ってedgeが分岐することはあっても合流することはないのでcurrentは一意に定まる
+        current = findprev(e -> e[2] == head, elist, current)
+        head, tail = elist[current]
+    end
+
+    return pushfirst!(path, head)
+end
+
+function neighborhood(
+    g::TopologyGraph{T, U},
+    start::Integer,
+    d::Integer
+) where {T<:Integer, U<:Real}
+    nbr = neighborhood_dists(g, start, d)
+
+    return [node for (node, dist) in nbr]
+end
+
+function neighborhood_dists(
+    g::TopologyGraph{T, U},
+    start::Integer,
+    d::Integer
+) where {T<:Integer, U<:Real}
+    if !has_vertex(g, start)
+        error("start node $start is out of range. ")
+    elseif d < 0
+        error("d must be non-negative. ")
+    elseif d == 0
+        return [(start, 0)]
+    end
+
+    visited = pushfirst!(
+        [(nbr, 1) for nbr in _neighbors(g, start)],
+        (start, 0)
+    )
+    d == 1 && return visited
+
+    for depth in 2:d
+        @assert length(visited) == depth-1
+        ith_nbr = outer_neighbors(g, visited)
+        @assert allunique(ith_nbr)
+        append!(visited, ith_nbr)
+    end
+    @assert visited[end][2] == d
+
+    return visited
+end
+
+function outer_neighbors(
+    g::TopologyGraph{T, U},
+    visited::AbstractVector{Tuple{T1, T1}}
+) where {T<:Integer, U<:Real, T1<:Integer}
+    if length(visited) < 2
+        error("given visited area must have ≥2 length, found $(length(visited)). ")
+    end
+
+    outer = Vector{Tuple{T, T}}()
+    maxdepth = visited[end][2]
+    # visited node at maxdepth and maxdepth-1
+    surface = view(
+        visited,
+        findlast(p -> p[2] == maxdepth-2, visited) + 1 : lastindex(visited) # equalto findall(p[2] > maxdepth-2)
+    )
+    for (node, depth) in surface
+        for nbr in _neighbors(g, node)
+            if all(nbr != p[1] for p in surface) && all(nbr != p[1] for p in outer)
+                push!(outer, (nbr, maxdepth+1))
+            end
+        end
+    end
+
+    return outer
+end
+
+
+
 function _insertsorted!(vec::AbstractVector{T}, x::U) where {T<:Real, U<:Real}
     i = searchsortedfirst(vec, x)
     insert!(vec, i, x)
@@ -535,61 +681,18 @@ function _setdiffsorted!(vec::AbstractVector{T}, rem::AbstractVector{U}) where {
     return nothing
 end
 
-
-
-
-function bfs_shortestpath(
-    g::TopologyGraph{T, U},
-    start::Integer,
-    finish::Integer,
-    maxdist::Integer = typemax(T)
-) where {T<:Integer, U<:Real}
-    if !has_vertex(g, start) || !has_vertex(g, finish)
-        error("start $start or finish $finish is out of range. ")
-    elseif start == finish || nv(g) == 1
-        return [start]
-    elseif nv(g) == 2
-        return [start, finish]
+function _unique_and_sorted(x::AbstractVector{<:Real})
+    result = true
+    for i in eachindex(x)[2:end]
+        @inbounds result &= (x[i] > x[i-1])
     end
+    return result
+end
 
-    # edge lists for tracking path
-    elist = Vector{Tuple{T, T}}()
-
-    buffer = (current=OrderedSet{T}(start), next=OrderedSet{T}())
-    visited = Set{T}(start)
-    depth = 1
-    while !isempty(buffer.current) && depth ≤ maxdist
-        # current node v
-        v = popfirst!(buffer.current)
-
-        # next nodes
-        for nbr in _neighbors(g, v)
-            if nbr ∉ visited
-                push!(buffer.next, nbr)
-                push!(visited, nbr)
-                push!(elist, (v, nbr))
-                nbr == finish && break
-            end
-        end
-
-        if isempty(buffer.current)
-            depth += 1
-            buffer = (current=buffer.next, next=buffer.current)
-        end
+function _issubset_sorted(x::AbstractVector{T}, y::AbstractVector{U}) where {T<:Real, U<:Real}
+    result = true
+    for e in x
+        result &= insorted(e, y)
     end
-
-    # path backtracking
-    @assert elist[end][2] == finish
-    path = T[elist[end][2]]
-    onpath = lastindex(elist)
-    head, tail = elist[onpath]
-    while head != start
-        @assert head != tail
-        pushfirst!(path, head)
-        onpath = findprev(e -> e[2] == head, elist, onpath)
-        head, tail = elist[onpath]
-    end
-    pushfirst!(path, head)
-
-    return path
+    return result
 end

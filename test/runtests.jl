@@ -168,7 +168,7 @@ function strict_eq(lh1::LabelHierarchy, lh2::LabelHierarchy)
     return true
 end
 
-function strict_eq(s1::System, s2::System)
+function strict_eq(s1::System, s2::System; dynamic_only=false)
     if any(x->abs(x)>1e-5, box(s1).origin - box(s2).origin)
         error("box origin mismatch. \n" *
             "    s1: $(box(s1).origin)" *
@@ -190,14 +190,21 @@ function strict_eq(s1::System, s2::System)
         )
     end
 
-    if natom(s1) != natom(s2)
+    if dynamic_only
+        if length(s1.position) != length(s2.position)
+            error("natom mismatch. \n" *
+                "    s1: $(length(s1.position))" *
+                "    s2: $(length(s2.position))"
+            )
+        end
+    elseif natom(s1) != natom(s2)
         error("natom mismatch. \n" *
             "    s1: $(natom(s1))" *
             "    s2: $(natom(s2))"
         )
     end
 
-    for i in 1:natom(s1)
+    for i in 1:length(s1.position)
         if any(x->abs(x)>1e-5, position(s1, i) - position(s2, i))
             error("atom $i position mismatch. \n" *
                 "    s1: $(position(s1, i))" *
@@ -289,7 +296,7 @@ function strict_eq(s1::System, s2::System)
     return true
 end
 
-function strict_eq(t1::Trajectory, t2::Trajectory)
+function strict_eq(t1::Trajectory, t2::Trajectory; dynamic_only=false)
     if t1.reactions != t2.reactions
         error("is_reaction mismatch. \n" *
             "    t1: $(t1.reactions)" *
@@ -298,7 +305,7 @@ function strict_eq(t1::Trajectory, t2::Trajectory)
     end
 
     for i in 1:length(t1)
-        strict_eq(t1.systems[i], t2.systems[i])
+        strict_eq(t1.systems[i], t2.systems[i]; dynamic_only=dynamic_only)
     end
 
     return true
@@ -337,6 +344,6 @@ end
         end
         hmdsave("test.hmd", traj)
         t1 = read_traj("test.hmd", 3, Float64, GeneralSystem)
-        strict_eq(traj, t1)
+        strict_eq(traj, t1; dynamic_only=true)
     end
 end

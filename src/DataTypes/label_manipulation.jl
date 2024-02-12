@@ -37,11 +37,25 @@ function add_label!(s::System, hname::AbstractString, label::HLabel; unsafe::Boo
 
     result = _add_label!(lh, label, unsafe)
     @match result begin
-        Label_Occupied => error("label $(label) already exists. ")
+        Label_Occupied => error("label $(label) already exists in $(hname). ")
         Success        => return nothing
         _              => error("fatal error")
     end
 end
+
+function replace!(s::System, hname::AbstractString, old_new::Pair{HLabel, HLabel})
+    lh = hierarchy(s, hname)
+
+    result = _replace!(lh, old_new)
+    @match result begin
+        Label_Missing     => error("label $(old_new[1]) not found in $(hname). ")
+        Label_Duplication => error("labels $(old_new) are equal. ")
+        Label_Occupied    => error("label $(old_new[2]) already exists in $(hname). ")
+        Success           => return s
+        _                 => error("fatal error")
+    end
+end
+
 
 #function add_label!(s::System, hname::AbstractString, label_type::AbstractString)
 #    lh = hierarchy(s, hname)
@@ -200,8 +214,8 @@ function super_labels(s::System, hname::AbstractString, label::HLabel)
     lh = hierarchy(s, hname)
     labels = HLabel[]
     current = _get_nodeid(lh, label)
-    while current == 0
-        push!(labels, _labels[current])
+    while current != 0 # root node id
+        push!(labels, _labels(lh)[current])
         current = _super_id(lh, current)
     end
 
@@ -210,10 +224,10 @@ end
 
 function sub_labels(s::System, hname::AbstractString, label::HLabel)
     lh = hierarchy(s, hname)
-    labels = HLabel[]
     current = _get_nodeid(lh, label)
-    stack = collect(_sub_id(lh, current))
+    stack = [current]
 
+    labels = HLabel[]
     while !isempty(stack)
         current = popfirst!(stack)
         append!(stack, _sub_id(lh, current))

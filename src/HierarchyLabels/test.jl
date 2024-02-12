@@ -149,149 +149,100 @@ function test()
         # small piece
         lh1 = let
             lh = LabelHierarchy()
-            _add_labels!(lh, [HLabel("lh1", i) for i in 1:6])
-            # under 1
-            for i in [2,3]
-                _add_relation!(lh; super = HLabel("lh1", 1), sub = HLabel("lh1", i), unsafe=false)
+            _add_labels!(
+                lh,
+                [
+                    HLabel("root", 1),
+                    HLabel("parent", 1), HLabel("parent", 2), # parent layer
+                    HLabel("child", 1), HLabel("child", 2),
+                    HLabel("child", 4), HLabel("child", 5), # skip 3
+                    HLabel("child", 6), HLabel("child", 10) #jump to 10
+                ]
+            )
+            _add_relation!(lh; super = HLabel("root", 1), sub = HLabel("parent", 1), unsafe=false)
+            _add_relation!(lh; super = HLabel("root", 1), sub = HLabel("parent", 2), unsafe=false)
+            # under parent 1
+            for i in (1,2,4)
+                _add_relation!(lh; super = HLabel("parent", 1), sub = HLabel("child", i), unsafe=false)
             end
-            # under 2
-            _add_relation!(lh; super = HLabel("lh1", 2), sub = HLabel("lh1", 4), unsafe=false)
-            # under 3
-            for i in [5,6]
-                _add_relation!(lh; super = HLabel("lh1", 3), sub = HLabel("lh1", i), unsafe=false)
+            # under parent 2
+            for i in (5,6)
+                _add_relation!(lh; super = HLabel("parent", 2), sub = HLabel("child", i), unsafe=false)
             end
+            # under child 6
+            _add_relation!(lh; super = HLabel("child", 6), sub = HLabel("child", 10), unsafe=false)
             lh
         end
         lh2 = let
-            lh = LabelHierarchy()
-            _add_labels!(lh, [HLabel("lh2", i) for i in 1:5])
-            # under 1
-            for i in [2,3]
-                _add_relation!(lh; super = HLabel("lh2", 1), sub = HLabel("lh2", i), unsafe=false)
-            end
-            # under 2
-            _add_relation!(lh; super = HLabel("lh2", 2), sub = HLabel("lh2", 4), unsafe=false)
-            # under 3
-            _add_relation!(lh; super = HLabel("lh2", 3), sub = HLabel("lh2", 5), unsafe=false)
+            # replacing id 1 => -1, 10 => 9 from lh1
+            lh = deepcopy(lh1)
+            _replace!(lh, HLabel("child", 1 ) => HLabel("child", -1))
+            _replace!(lh, HLabel("child", 10) => HLabel("child", 9 ))
+            _add_label!(lh, HLabel("child", 11))
+            _add_relation!(lh; super = HLabel("child", 6), sub = HLabel("child", 11), unsafe=false)
             lh
         end
-        lh3 = let
-            lh = LabelHierarchy()
-            _add_labels!(lh, [HLabel("lh3", i) for i in 1:5])
-            # under 1
-            for i in [2,3]
-                _add_relation!(lh; super = HLabel("lh3", 1), sub = HLabel("lh3", i), unsafe=false)
-            end
-            # under 3
-            for i in [4,5]
-                _add_relation!(lh; super = HLabel("lh3", 3), sub = HLabel("lh3", i), unsafe=false)
-            end
-            lh
-        end
-        lh12 = let
-            lh = LabelHierarchy()
-            _add_labels!(lh, [HLabel("lh1", i) for i in 1:5])
-            # under 1
-            for i in [2,3]
-                _add_relation!(lh; super = HLabel("lh1", 1), sub = HLabel("lh1", i), unsafe=false)
-            end
-            # under 2
-            _add_relation!(lh; super = HLabel("lh1", 2), sub = HLabel("lh1", 4), unsafe=false)
-            # under 3
-            _add_relation!(lh; super = HLabel("lh1", 3), sub = HLabel("lh1", 5), unsafe=false)
-            lh
-        end
-        lh13 = let
-            lh = LabelHierarchy()
-            _add_labels!(lh, [HLabel("lh1", i) for i in 1:5])
-            # under 1
-            for i in [2,3]
-                _add_relation!(lh; super = HLabel("lh1", 1), sub = HLabel("lh1", i), unsafe=false)
-            end
-            # under 3
-            for i in [4,5]
-                _add_relation!(lh; super = HLabel("lh1", 3), sub = HLabel("lh1", i), unsafe=false)
-            end
-            lh
-        end
-
 
         # test oracle
-        oracle1 = let
+        oracle_p1p1 = let
             # oracle for
             #   _merge_hierarchy!(
-            #       tl,
+            #       lh1,
             #       lh2;
-            #       augend_parent = HLabel("lh1", 1),
-            #       addend_parent = HLabel("lh2", 1)
+            #       augend_parent = HLabel("parent", 1),
+            #       addend_parent = HLabel("parent", 1)
             #   )
             lh = deepcopy(lh1)
-            # HLabel("lh2", 1) in lh2 is removed, then label ids in lh2 are shifted: 2:5 -> 1:4
-            @test _add_labels!(lh, [HLabel("lh2", i) for i in (2-1):(5-1)]) == Success
-            # under ("l1", 1)
-            @test _add_relation!(lh; super=HLabel("lh1", 1), sub=HLabel("lh2", 2-1), unsafe=false) == Success
-            @test _add_relation!(lh; super=HLabel("lh1", 1), sub=HLabel("lh2", 3-1), unsafe=false) == Success
-            # under ("lh2", 2), ("lh2", 3)
-            @test _add_relation!(lh; super=HLabel("lh2", 2-1), sub=HLabel("lh2", 4-1), unsafe=false) == Success
-            @test _add_relation!(lh; super=HLabel("lh2", 3-1), sub=HLabel("lh2", 5-1), unsafe=false) == Success
+            for i in (-1, 11, 12)
+                @assert _add_label!(lh, HLabel("child", i)) == Success
+                @assert _add_relation!(lh; super = HLabel("parent", 1), sub = HLabel("child", i), unsafe=false) == Success
+            end
             @test _label_connected(lh)
             @test _label_nocycle(lh)
             @test _label_unique(lh)
             lh
         end
-        oracle2 = let
+        oracle_p2p1 = let
             # oracle for
             #   _merge_hierarchy!(
-            #       tl,
-            #       lh3;
-            #       augend_parent = HLabel("lh1", 5),
-            #       addend_parent = HLabel("lh3", 3)
+            #       lh1,
+            #       lh2;
+            #       augend_parent = HLabel("parent", 2),
+            #       addend_parent = HLabel("parent", 1)
             #   )
             lh = deepcopy(lh1)
-            @test _add_labels!(lh, [HLabel("lh3", i) for i in (4-3):(5-3)]) == Success
-            # under ("l1", 3)
-            @test _add_relation!(lh; super=HLabel("lh1", 3), sub=HLabel("lh3", 4-3), unsafe=false) == Success
-            @test _add_relation!(lh; super=HLabel("lh1", 3), sub=HLabel("lh3", 5-3), unsafe=false) == Success
+            for i in (-1, 11, 12)
+                @assert _add_label!(lh, HLabel("child", i)) == Success
+                @assert _add_relation!(lh; super = HLabel("parent", 2), sub = HLabel("child", i), unsafe=false) == Success
+            end
             @test _label_connected(lh)
             @test _label_nocycle(lh)
             @test _label_unique(lh)
             lh
         end
-        oracle11 = let
+        oracle_p2p2 = let
             # oracle for
             #   _merge_hierarchy!(
-            #       tl,
-            #       lh12;
-            #       augend_parent = HLabel("lh1", 1),
-            #       addend_parent = HLabel("lh1", 1)
+            #       lh1,
+            #       lh2;
+            #       augend_parent = HLabel("parent", 2),
+            #       addend_parent = HLabel("parent", 2)
             #   )
             lh = deepcopy(lh1)
-            # HLabel("lh1", 1) in lh2 is removed, then label ids in lh2 are shifted: 2:5 -> 1:4
-            @test _add_labels!(lh, [HLabel("lh1", i) for i in 7:10]) == Success
-            # under ("l1", 1)
-            @test _add_relation!(lh; super=HLabel("lh1", 1), sub=HLabel("lh1", 7), unsafe=false) == Success
-            @test _add_relation!(lh; super=HLabel("lh1", 1), sub=HLabel("lh1", 8), unsafe=false) == Success
-            # under ("lh1", 2), ("lh1", 3)
-            @test _add_relation!(lh; super=HLabel("lh1", 7), sub=HLabel("lh1", 9),  unsafe=false) == Success
-            @test _add_relation!(lh; super=HLabel("lh1", 8), sub=HLabel("lh1", 10), unsafe=false) == Success
-            @test _label_connected(lh)
-            @test _label_nocycle(lh)
-            @test _label_unique(lh)
-            lh
-        end
-        oracle12 = let
-            # oracle for
-            #   _merge_hierarchy!(
-            #       tl,
-            #       lh13;
-            #       augend_parent = HLabel("lh1", 3),
-            #       addend_parent = HLabel("lh1", 3)
-            #   )
-            lh = deepcopy(lh1)
-            @test _add_labels!(lh, [HLabel("lh1", i) for i in 7:8]) == Success
-            # under ("l1", 3)
-            @test _add_relation!(lh; super=HLabel("lh1", 3), sub=HLabel("lh1", 7), unsafe=false) == Success
-            @test _add_relation!(lh; super=HLabel("lh1", 3), sub=HLabel("lh1", 8), unsafe=false) == Success
+            for i in (11, 12, 9, 13)
+                @assert _add_label!(lh, HLabel("child", i)) == Success
+                if i ∈ (11, 12)
+                    @assert _add_relation!(
+                        lh; super = HLabel("parent", 2),
+                        sub = HLabel("child", i), unsafe=false
+                    ) == Success
+                else
+                    _add_relation!(
+                        lh; super = HLabel("child", 12),
+                        sub = HLabel("child", i), unsafe=false
+                    ) == Success
+                end
+            end
             @test _label_connected(lh)
             @test _label_nocycle(lh)
             @test _label_unique(lh)
@@ -302,37 +253,29 @@ function test()
         _merge_hierarchy!(
             tl,
             lh2;
-            augend_parent = HLabel("lh1", 1),
-            addend_parent = HLabel("lh2", 1)
+            augend_parent = HLabel("parent", 1),
+            addend_parent = HLabel("parent", 1)
         )
-        @test tl == oracle1
+        @test tl == oracle_p1p1
 
         tl = deepcopy(lh1)
         _merge_hierarchy!(
             tl,
-            lh3;
-            augend_parent = HLabel("lh1", 3),
-            addend_parent = HLabel("lh3", 3)
+            lh2;
+            augend_parent = HLabel("parent", 2),
+            addend_parent = HLabel("parent", 1)
         )
-        @test tl == oracle2
+        @test tl == oracle_p2p1
 
         tl = deepcopy(lh1)
         _merge_hierarchy!(
             tl,
-            lh12;
-            augend_parent = HLabel("lh1", 1),
-            addend_parent = HLabel("lh1", 1)
+            lh2;
+            augend_parent = HLabel("parent", 2),
+            addend_parent = HLabel("parent", 2)
         )
-        @test tl == oracle11
+        @test tl == oracle_p2p2
 
-        tl = deepcopy(lh1)
-        _merge_hierarchy!(
-            tl,
-            lh13;
-            augend_parent = HLabel("lh1", 3),
-            addend_parent = HLabel("lh1", 3)
-        )
-        @test tl == oracle12
     end # testset
 
 end #testset

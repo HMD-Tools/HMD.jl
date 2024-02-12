@@ -2,6 +2,7 @@ module TopologyGraphs
 
 using DataStructures
 using Distributions
+using Logging
 using Random
 using SparseArrays: SparseMatrixCSC, sparse, spzeros, nnz, findnz, spdiagm, nzrange
 using Test

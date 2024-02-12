@@ -1,5 +1,55 @@
 function test()
 
+randweight(rng) = rand(rng, (1//1, 2//1, 3//1, 3//2))
+
+function _path_graph(n, rng)
+    g = TopologyGraph{Int64, Rational{Int8}}()
+    add_vertices!(g, n)
+    for i in 1:nv(g)-1
+        add_edge!(g, i, i+1, randweight(rng))
+    end
+    return g
+end
+
+function _testgraph_shortest_path(rng)
+    n = 30
+    m = 10
+    @assert m < 2n
+    @assert m > 5
+    # return graph with 2 path from node 1 to n
+    # shorter path crosses to longer mainpath like (n+m÷2) -- (n÷2) -- (n+m÷2+1)
+    # long main path: 1 -> 2 -> ... -> n
+    # shortcut: 1 -> n+1 -> ... -> (n+m÷2) -> (n÷2) -> (n+m÷2+1) -> ... -> n+m -> n
+    cross_shortcut = n+m÷2
+    cross_mainpath = n ÷ 2
+    shortest_path = vcat(
+        1,
+        n+1:cross_shortcut-1,
+        [cross_shortcut, cross_mainpath, cross_shortcut+1],
+        cross_shortcut+2:n+m,
+        n
+    )
+
+    g = _path_graph(n, rng) # main path graph
+    # add shortcut path
+    add_vertices!(g, m)
+    @assert sort(filter(i -> degree(g, i)==0, vertices(g))) == n+1:(n+m)
+    # shortcut begin
+    add_edge!(g, 1, n+1, randweight(rng))
+    for i in n+1:cross_shortcut-1
+        @assert add_edge!(g, i, i+1, randweight(rng))
+    end
+    @assert add_edge!(g, cross_shortcut, cross_mainpath  , randweight(rng))
+    @assert add_edge!(g, cross_mainpath, cross_shortcut+1, randweight(rng))
+    for i in cross_shortcut+1:(n+m)-1
+        @assert add_edge!(g, i, i+1, randweight(rng))
+    end
+    # end shortcut
+    add_edge!(g, n+m, n, randweight(rng))
+
+    return shortest_path, g
+end
+
 @testset "TopologyGraph" begin
 
 function random_graph(nv, max_degree, rng)
@@ -76,6 +126,7 @@ for _ in 1:5
     @test vertices(topo) == vertices(wg)
     @test nv(topo) == nv(wg)
     for v in shuffle(vertices(topo))
+        @test issorted(all_neighbors(topo, v))
         @test has_vertex(topo, v) == has_vertex(wg, v)
         @test inneighbors(topo, v) == inneighbors(wg, v)
         @test outneighbors(topo, v) == outneighbors(wg, v)
@@ -153,17 +204,47 @@ end # for loop
 
 rng = Xoshiro(1)
 @testset "bfs_shortestpath_path" begin
-    _path = TopologyGraph{Int64, Rational{Int8}}()
-    add_vertices!(_path, 10)
-    for i in 1:nv(_path)-1
-        add_edge!(_path, i, i+1, rand(rng, (1//1, 2//1, 3//1, 3//2)))
+    shortest_path, g = _testgraph_shortest_path(rng)
+    @test_throws ErrorException bfs_shortestpath(g, 1, Int64[])
+    @test_throws ErrorException bfs_shortestpath(g, 1, [1,4,6,8,20], Int64[])
+    @test_throws ErrorException bfs_shortestpath(g, 1, [1,4,6,8,105])
+    @test_throws ErrorException bfs_shortestpath(g, 1, [20,1,4,6,8])
+    @test_throws ErrorException bfs_shortestpath(g, 1, [1,4,6,8,20], [1,4,8,20])
+
+    @test bfs_shortestpath(g, 1, 1) == [[1]]
+    @test bfs_shortestpath(g, 1, [1]) == [[1]]
+    @test bfs_shortestpath(g, 1, [1, 2]) == [[1], [1, 2]]
+    @test bfs_shortestpath(g, 2, [1, 2]) == [[2, 1], [2]]
+    @test bfs_shortestpath(g, 2, [1, 2, 3]) == [[2, 1], [2], [2, 3]]
+    result = bfs_shortestpath(g, 1, sort(shortest_path))
+    result_noncennect = let
+        _g = deepcopy(g)
+        add_vertices!(_g, 10)
+        bfs_shortestpath(_g, 1, sort(shortest_path), vertices(g))
     end
-    result = bfs_shortestpath(_path, 1, 10)
-    oracle = let
-        elist = a_star(path_graph(10), 1, 10)
-        push!([src(e) for e in elist], dst(elist[end]))
+    @test result == result_noncennect == [
+        shortest_path[1:i] for i in eachindex(shortest_path)
+    ]
+
+    sg = let
+        sg = SimpleWeightedGraph{Int64, Rational{Int8}}()
+        add_vertices!(sg, nv(g))
+        for e in edges(g)
+            # edge weight is 1//1 b.c. weight (= bond order) is not related to
+            # topological distance on molecular graph
+            add_edge!(sg, src(e), dst(e), 1//1)
+        end
+        sg
     end
-    @test result == oracle
+    for (i, finish) in enumerate(shortest_path)
+        i == 1 && continue # a_star returns empty edge list
+        elist = a_star(sg, 1, finish)
+        path = push!([src(e) for e in elist], dst(elist[end]))
+        @test length(result[i]) == length(path)
+        @test result[i] == path
+    end
+
+    @inferred bfs_shortestpath(g, Int16(1), Int32[1, 4, 6, 8, 20])
 end
 
 @testset "cycle detection" begin
