@@ -212,13 +212,12 @@ function is_reaction(s::System)
 end
 
 function similar_system(
-    traj::Trajectory{D, F, SysType, L};
+    traj::Trajectory{D, F, SysType, L},
+    precision::Type{<:AbstractFloat} = F;
     reserve_dynamic = false,
-    reserve_static = false,
-    precision::Union{Type{<:AbstractFloat}, Nothing} = nothing
+    reserve_static = false
 ) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
-    T = isnothing(precision) ? F : precision
-    s = System{D, T, SysType}()
+    s = System{D, precision, SysType}()
 
     if reserve_dynamic
         import_dynamic!(s, traj, 1)

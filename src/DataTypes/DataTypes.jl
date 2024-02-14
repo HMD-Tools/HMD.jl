@@ -217,8 +217,14 @@ function system_type(s::System{D, F, SysType, L}) where {D, F<:AbstractFloat, Sy
     return SysType
 end
 
-function Base.similar(s::System{D, F, SysType, L}; reserve_dynamic::Bool=false, reserve_static::Bool=false) where {D, F, SysType, L}
-    sim = System{D, F, SysType}()
+function Base.similar(
+    s::System{D, F, SysType, L},
+    precision::Type{<:AbstractFloat} = F;
+    reserve_dynamic::Bool = false,
+    reserve_static::Bool = false#,
+    #precision::Type{<:AbstractFloat} = F
+) where {D, F<:AbstractFloat, SysType, L}
+    sim = System{D, precision, SysType}()
     if reserve_dynamic
         set_time!(sim, time(s))
         set_box!(sim, box(s))
