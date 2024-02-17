@@ -116,12 +116,14 @@ function test()
         @test _add_relation!(lh; super = l2, sub = l3, unsafe=true) == Success
         @test _add_relation!(lh; super = l1, sub = l2, unsafe=true) == Success
         # make cycle
-        @test _add_relation!(lh; super = l3, sub = l1, unsafe=true) == Success
-        @test _label_nocycle(lh) == false
+        cycled = deepcopy(lh)
+        @test _add_relation!(cycled; super = l3, sub = l1, unsafe=true) == Success
+        @test _label_nocycle(cycled) == false
         # add isolated label
-        @test _label_connected(lh) == true
-        @test _add_label!(lh, HLabel("isolate", 1), true) == Success
-        @test _label_connected(lh) == false
+        iso = deepcopy(lh)
+        @test _label_connected(iso) == true
+        @test _add_label!(iso, HLabel("isolate", 1), true) == Success
+        @test _label_connected(iso) == false
     end
 
     addrel1 = let
@@ -145,6 +147,7 @@ function test()
     @test _remove_relation!(lh, l2, l1) == Relation_Missing
 
     @testset "Hierarchy Merge" begin
+        # TODO: add atom label to test samples
         # hierarchy merge test
         # small piece
         lh1 = let

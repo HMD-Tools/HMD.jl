@@ -90,7 +90,6 @@ using ..TopologyGraphs
     add_relation!,
     add_relations!,
     insert_relation!,
-    insert_relations!,
     remove_label!,
     remove_relation!,
     label_unique,
@@ -101,6 +100,8 @@ using ..TopologyGraphs
     issub,
     super,
     sub,
+    super_labels,
+    sub_labels,
 
     # system io interface
     AbstractFileFormat,
@@ -140,8 +141,6 @@ export Position, BoundingBox, HLabel, LabelHierarchy
 # core immut signature
 export GeneralSystem, System, print_to_string
 
-# optimized functions
-export super_labels, sub_labels
 
 # fileIO
 export H5traj, SerializedTopology, PackedHierarchy
@@ -618,12 +617,12 @@ function merge!(
     end
 
     # add new atoms to augend
-    id_mapping = natom(augend)+1 : natom(augend)+natom(addend) # id_mapping[addend_id] == augend_id
+    atom_mapping = natom(augend)+1 : natom(augend)+natom(addend) # atom_mapping[addend_atom] == augend_atom
     append!(augend.position, all_positions(addend))
     append!(augend.travel, all_travels(addend))
     append!(augend.element, all_elements(addend))
 
-    _merge_topology!(topology(augend), topology(addend), id_mapping)
+    _merge_topology!(topology(augend), topology(addend), atom_mapping)
 
     for hname in keys(augend_parents)
         lh_augend = hierarchy(augend, hname)
@@ -632,6 +631,7 @@ function merge!(
             lh_augend, lh_addend;
             augend_parent = augend_parents[hname],
             addend_parent = addend_parents[hname],
+            atom_mapping,
             unsafe = unsafe
         )
     end
@@ -644,10 +644,10 @@ function merge!(
 end
 
 function _merge_topology!(
-    augend::SimpleWeightedGraph,
-    addend::SimpleWeightedGraph,
+    augend::TopologyGraph{I, Rational{BO_Precision}},
+    addend::TopologyGraph{I, Rational{BO_Precision}},
     id_mapping::AbstractVector{T}
-) where {T<:Integer}
+) where {I<:Integer, T<:Integer}
     @assert id_mapping == nv(augend)+1 : nv(augend)+nv(addend)
     add_vertices!(augend, nv(addend))
     for edge in edges(addend)

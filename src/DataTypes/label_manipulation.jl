@@ -17,13 +17,21 @@ function add_hierarchy!(s::System, hname::AbstractString)
     return nothing
 end
 
+function add_hierarchy!(s::System, hnames::Union{Tuple, Base.Generator, V}) where {V<:AbstractVector{<:AbstractString}}
+    for hname in hnames
+        add_hierarchy!(s, hname)
+    end
+
+    return nothing
+end
+
 function remove_hierarchy!(s::System, hname::AbstractString)
     delete!(s.hierarchy, hname)
 end
 
 function all_labels(s::System, hname::AbstractString)
     lh = hierarchy(s, hname)
-    return _labels(lh)
+    return deepcopy(_labels(lh))
 end
 
 function all_labels(s::System, hname::AbstractString, label_type::AbstractString)
@@ -49,7 +57,7 @@ function replace!(s::System, hname::AbstractString, old_new::Pair{HLabel, HLabel
     result = _replace!(lh, old_new)
     @match result begin
         Label_Missing     => error("label $(old_new[1]) not found in $(hname). ")
-        Label_Duplication => error("labels $(old_new) are equal. ")
+        Label_Duplication => return s
         Label_Occupied    => error("label $(old_new[2]) already exists in $(hname). ")
         Success           => return s
         _                 => error("fatal error")
@@ -70,7 +78,7 @@ end
 #    end
 #end
 
-function add_labels!(s::System, hname::AbstractString, labels::AbstractVector{HLabel})
+function add_labels!(s::System, hname::AbstractString, labels::Union{Tuple, Base.Generator, V}) where {V<:AbstractVector{HLabel}}
     lh = hierarchy(s, hname)
 
     _add_labels!(lh, labels)
@@ -103,7 +111,7 @@ function add_relation!(
     end
 end
 
-function add_relations!(s::System, hname::AbstractString; super::HLabel, subs::AbstractVector{HLabel})
+function add_relations!(s::System, hname::AbstractString; super::HLabel, subs::Union{Tuple, Base.Generator, V}) where {V<:AbstractVector{HLabel}}
     lh = hierarchy(s, hname)
     for sub in subs
         _add_relation!(lh; super=super, sub=sub, unsafe=true)
@@ -222,6 +230,8 @@ function super_labels(s::System, hname::AbstractString, label::HLabel)
     return labels
 end
 
+super_labels(s::System, hname::AbstractString, atom::Integer) = super_labels(s, hname, HLabel("", atom))
+
 function sub_labels(s::System, hname::AbstractString, label::HLabel)
     lh = hierarchy(s, hname)
     current = _get_nodeid(lh, label)
@@ -236,6 +246,8 @@ function sub_labels(s::System, hname::AbstractString, label::HLabel)
 
     return labels
 end
+
+sub_labels(s::System, hname::AbstractString, atom::Integer) = sub_labels(s, hname, HLabel("", atom))
 
 function label2atom(s::System, hname::AbstractString, label::HLabel)
     if isatom(label)

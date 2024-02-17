@@ -281,7 +281,7 @@ function _add_label!(lh::LabelHierarchy, label::HLabel, unsafe::Bool=false)
     return Success
 end
 
-function _add_labels!(lh::LabelHierarchy, labels::AbstractVector{HLabel})
+function _add_labels!(lh::LabelHierarchy, labels::Union{Tuple, Base.Generator, V}) where {V<:AbstractVector{HLabel}}
     nv = _nv(lh)
 
     new_ids = (nv + one(nv)) : (nv + length(labels))
@@ -390,12 +390,25 @@ end
 
 function _label_nocycle(lh::LabelHierarchy)
     g = _nodes(lh)
-    return count(==(0), g.super) == 1
+    return g.super[1] == 0
 end
 
 function _label_connected(lh::LabelHierarchy)
     g = _nodes(lh)
-    return all(id -> _degree(g, id) != 0, _vertices(g))
+    stack = findall(iszero, g.super)
+    if length(stack) != 1
+        return false
+    end
+
+    visited = [stack[1]]
+    while !isempty(stack)
+        v = popfirst!(stack)
+        nbr = _sub_id(lh, v)
+        append!(stack, nbr)
+        append!(visited, nbr)
+    end
+
+    return length(visited) == _nv(lh)
 end
 
 function _contains(lh::LabelHierarchy, label::HLabel)
@@ -503,6 +516,7 @@ function _merge_hierarchy!(
     addend::LabelHierarchy;
     augend_parent::HLabel,
     addend_parent::HLabel,
+    atom_mapping::AbstractVector{Int64},
     unsafe::Bool = false
 )
     # addend_parent自身とその上位ノードはマージから除外する
@@ -511,15 +525,18 @@ function _merge_hierarchy!(
     @assert !isnothing(exception)
 
     # addend node id => augend node id
-    node_mapping = Dict{Int64, Int64}()
-    forward_shift = _nv(augend)
-    back_shift = 0
-    for id in 1:_nv(addend)
-        if id ∈ exception
-            back_shift += 1
-            continue
+    node_mapping = let
+        d = Dict{Int64, Int64}()
+        forward_shift = _nv(augend)
+        back_shift = 0
+        for id in 1:_nv(addend)
+            if id ∈ exception
+                back_shift += 1
+                continue
+            end
+            d[id] = id + forward_shift - back_shift
         end
-        node_mapping[id] = id + forward_shift - back_shift
+        d
     end
 
     # if augend and addend has the same labels, the id in labels in addend are updated
@@ -529,7 +546,10 @@ function _merge_hierarchy!(
     for label in _labels(addend)
         _label2node(addend)[label] ∈ exception && continue
         ltype = type(label)
-        if label ∉ augend && label ∉ values(oldnew)
+        if ltype == ""
+            new_id = atom_mapping[id(label)]
+            oldnew[label] = HLabel(ltype, new_id)
+        elseif label ∉ augend && label ∉ values(oldnew)
             oldnew[label] = label
         else
             if !haskey(maxid_augend, ltype)
@@ -548,34 +568,20 @@ function _merge_hierarchy!(
             oldnew[label] = HLabel(ltype, maxid+1)
         end
     end
-    @assert allunique(values(oldnew))
 
-    # augendに既に存在するラベル数を記録
-    # augendになくaddendにあるラベルのcounterは0
-    #counter = Dict{String, Int64}() #
-    #for label in _labels(augend)
-    #    if !haskey(counter, type(label))
-    #        counter[type(label)] = 0
-    #    end
-    #    counter[type(label)] += 1
-    #end
-    #for label in _labels(addend)
-    #    if !haskey(counter, type(label))
-    #        counter[type(label)] = 0
-    #    end
-    #end
-
-    # merge vertices and labels
+    # merge vertices and resize labels
     g_augend, g_addend = _nodes(augend), _nodes(addend)
     _add_nodes!(g_augend, _nv(g_addend) - length(exception))
     resize!(_labels(augend), _nv(g_augend))
 
     # merge edges
+    # augend parent and addend nodes are not connected in this for-loop
     for edge in _edges(g_addend)
         if _src(edge) ∉ exception && _dst(edge) ∉ exception
             _add_edge!(g_augend, node_mapping[_src(edge)], node_mapping[_dst(edge)])
         end
     end
+
     # connect top of addend hierarchy and augend_parent
     # number of addend part top may be >= 2
     addend_part_top = [node_mapping[id] for id in _sub_id(addend, addend_parent)]
@@ -598,16 +604,10 @@ function _merge_hierarchy!(
     end
     @assert length(_label2node(augend)) == length(_labels(augend)) == _nv(augend)
     @assert _label_nocycle(augend) # O(1) cost
-    #for (old_id, new_id) in sort(collect(pairs(node_mapping)), by=x->x[2])
-    #    ltype = _get_label(addend, old_id) |> type
-    #    counter[ltype] += 1
-    #    _labels(augend)[new_id] = HLabel(ltype, counter[ltype])
-    #    push!(_label2node(augend), HLabel(ltype, counter[ltype]) => new_id)
-    #end
 
     if !unsafe # checks of O(n) cost
         _label_unique(augend) || error("label is not unique. ")
-        _label_connected(augend) || error("isolated label found. ")
+        _label_connected(augend) || error("isolated labels found. ")
     end
 
     return nothing

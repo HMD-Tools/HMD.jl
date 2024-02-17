@@ -195,29 +195,6 @@ function contains(atom::HLabel, s::AbstractSystem, hname::AbstractString, label:
     return label ∈ super_labels(s, hname, atom)
 end
 
-function super_labels(s::AbstractSystem, hname::AbstractString, label::HLabel)
-    return _traverse_from(s, hname, label, super)
-end
-
-function sub_labels(s::AbstractSystem, hname::AbstractString, label::HLabel)
-    return _traverse_from(s, hname, label, sub)
-end
-
-function _traverse_from(s::AbstractSystem, hname::AbstractString, label::HLabel, func::Function)
-    labels = Vector{HLabel}(undef, 0)
-
-    # func is either super or sub
-    stack = [label]
-    while !isempty(stack)
-        current = popfirst!(stack)
-        next = func(s, hname, current)
-        prepend!(stack, next)
-        push!(labels, current)
-    end
-
-    return labels
-end
-
 function hierarchy_leaf_isatom(s::AbstractSystem)
     for hname in hierarchy_names(s)
         for label in all_labels(s, hname)
