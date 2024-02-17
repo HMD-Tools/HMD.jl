@@ -3,6 +3,16 @@ Base.@kwdef struct TopologyGraph{T<:Integer, U<:Real} <: AbstractSimpleWeightedG
     weights::Vector{Vector{U}} = Vector{Vector{U}}()
 end
 
+function TopologyGraph{T, U}(g::AbstractGraph{T}) where {T, U}
+    tg = TopologyGraph{T, U}()
+    add_vertices!(tg, nv(g))
+    for e in edges(g)
+        add_edge!(tg, src(e), dst(e), one(U))
+    end
+
+    return tg
+end
+
 Base.zero(g::TopologyGraph{T, U}) where {T<:Integer, U<:Real} = TopologyGraph{T, U}()
 Base.zero(::Type{TopologyGraph{T, U}}) where {T<:Integer, U<:Real} = TopologyGraph{T, U}()
 
