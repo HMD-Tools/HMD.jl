@@ -16,9 +16,6 @@ function Trajectory(s::System{D, F, SysType, L}) where {D, F<:AbstractFloat, Sys
     return Trajectory{D, F, SysType, L}([s], [1])
 end
 
-firstindex(traj::AbstractTrajectory) = 1
-lastindex(traj::AbstractTrajectory) = length(traj)
-
 function Base.show(
     io::IO, ::MIME"text/plain", traj::Trajectory{D, F, S, L}
 ) where {D, F<:AbstractFloat, S<:AbstractSystemType, L}
