@@ -315,7 +315,7 @@ end
 
 @testset "HMD.jl" begin
     @testset "TopologyGraphs" begin
-        #HMD.TopologyGraphs.test()
+        HMD.TopologyGraphs.test()
     end
 
     @testset "HierarchyHLabels" begin
@@ -327,7 +327,7 @@ end
     end
 
     @testset "trajectory" begin
-        #include("trajectory.jl")
+        include("trajectory.jl")
     end
 
     @testset "merge system" begin
