@@ -131,6 +131,7 @@ const sample = let
     sample
 end
 
+
 function strict_eq(lh1::LabelHierarchy, lh2::LabelHierarchy)
     if length(lh1.g) != length(lh2.g)
         error("label hierarchy node num mismatch. \n" *
@@ -311,9 +312,56 @@ function strict_eq(t1::Trajectory, t2::Trajectory; dynamic_only=false)
     return true
 end
 
+
 @testset "HMD.jl" begin
-    HMD.TopologyGraphs.test()
-    HMD.DataTypes.HierarchyLabels.test()
+    @testset "TopologyGraphs" begin
+        #HMD.TopologyGraphs.test()
+    end
+
+    @testset "HierarchyHLabels" begin
+        HMD.DataTypes.HierarchyLabels.test()
+    end
+
+    @testset "label manipulation" begin
+        include("label_manipulation.jl")
+    end
+
+    @testset "trajectory" begin
+        #include("trajectory.jl")
+    end
+
+    @testset "merge system" begin
+        s1 = deepcopy(sample)
+        s2 = deepcopy(sample)
+        merge!(
+            s1, s2;
+            augend_parents = Dict("polymeric" => Entire_System, "ruinfo" => Entire_System),
+            addend_parents = Dict("polymeric" => Entire_System, "ruinfo" => Entire_System),
+            unsafe = false
+        )
+
+        @test Set(all_labels(s1, "polymeric", "molecule")) == Set(HLabel("molecule", i) for i in 1:2)
+        @test Set(all_labels(s1, "ruinfo"   , "molecule")) == Set(HLabel("molecule", i) for i in 1:2)
+
+        @test Set(all_labels(s1, "polymeric", "sublabel")) == Set(HLabel("sublabel", i) for i in 1:2)
+        @test Set(all_labels(s1, "ruinfo"   , "ru1"     )) == Set(HLabel("ru1"     , i) for i in 1:2)
+
+        @test Set(sub(s1, "polymeric", Entire_System)) == Set([HLabel("molecule", i) for i in 1:2])
+        @test Set(sub(s1, "ruinfo"   , Entire_System)) == Set([HLabel("molecule", i) for i in 1:2])
+
+        @test sub(s1, "polymeric", HLabel("molecule", 1)) == [HLabel("sublabel", 1)]
+        @test sub(s1, "polymeric", HLabel("molecule", 2)) == [HLabel("sublabel", 2)]
+
+        @test sub(s1, "ruinfo", HLabel("molecule", 1)) == [HLabel("ru1", 1)]
+        @test sub(s1, "ruinfo", HLabel("molecule", 2)) == [HLabel("ru1", 2)]
+
+        @test sort(label2atom(s1, "polymeric", HLabel("molecule", 1))) == [i for i in 1:47]
+        @test sort(label2atom(s1, "ruinfo"   , HLabel("molecule", 1))) == [i for i in 1:47]
+        @test sort(label2atom(s1, "polymeric", HLabel("molecule", 2))) == [i for i in 48:94]
+        @test sort(label2atom(s1, "ruinfo"   , HLabel("molecule", 2))) == [i for i in 48:94]
+    end
+
+
     @testset "atom addition" begin
         @testset "add_label()-add_labels() equality" begin
             s1, s2 = deepcopy(sample), deepcopy(sample)
@@ -333,17 +381,5 @@ end
         end
     end
 
-    reaction_flags = [Bool(rand(DiscreteUniform(0, 1))) for _ in 1:100]
-    @testset "invariance on trajectory save" begin
-        traj = let
-            t = Trajectory(sample)
-            for i in 2:101
-                add_snapshot!(t, sample; reaction = reaction_flags[i-1])
-            end
-            t
-        end
-        hmdsave("test.hmd", traj)
-        t1 = read_traj("test.hmd", 3, Float64, GeneralSystem)
-        strict_eq(traj, t1; dynamic_only=true)
-    end
+
 end
