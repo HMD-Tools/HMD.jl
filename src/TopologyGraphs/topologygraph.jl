@@ -526,7 +526,7 @@ function bfs_shortestpath(
     return bfs_shortestpath(g, start, [finish], area)
 end
 
-function bfs_shortestpath(
+function _bfs_shortestpath(
     g::TopologyGraph{T, U},
     start::Integer,
     finish::AbstractVector{T1},
@@ -571,7 +571,8 @@ function bfs_shortestpath(
     # if start ∈ finish, the path [start] is not added in the BFS search above
     i = searchsortedfirst(finish, start)
     if finish[i] == start # equal to (start ∈ finish)
-        insert!(path, i, [start])
+        #insert!(path, i, [start])
+        pushfirst!(path, [start])
     end
 
     return path
@@ -581,6 +582,9 @@ end
 function _path(elist::AbstractVector{Tuple{T,T}}, start::Integer, finish::Integer) where {T<:Integer}
     @assert elist[end][2] == finish
 
+    # define support function to avoid runtime dispatch caused by captured variable
+    findprev_equal(equalto, elist, i) = findprev(e -> e[2] == equalto, elist, i)
+
     path = T[elist[end][2]]
     current = lastindex(elist)
     head, tail = elist[current]
@@ -588,12 +592,95 @@ function _path(elist::AbstractVector{Tuple{T,T}}, start::Integer, finish::Intege
         @assert head != tail
         pushfirst!(path, head)
         # 呼び出し元のBFSに伴ってedgeが分岐することはあっても合流することはないのでcurrentは一意に定まる
-        current = findprev(e -> e[2] == head, elist, current)
+        current = findprev_equal(head, elist, current)
         head, tail = elist[current]
     end
 
     return pushfirst!(path, head)
 end
+
+
+struct BFShotestState{T<:Integer}
+    distance::Dict{T, T} # distance[v] == distance from `start` to v
+    predecessor::Dict{T, T} # predecessor[v] == predecessor of v in BFS
+end
+
+function getpath(state::BFShotestState{T}, v::Integer) where {T<:Integer}
+    if v ∉ keys(state.distance)
+        error("atom $atom is not in the shortest path. ")
+    end
+
+    path = T[v]
+    u = v
+    while u != state.predecessor[u]
+        u = state.predecessor[u]
+        pushfirst!(path, u)
+    end
+
+    return path
+end
+
+function getdist(state::BFShotestState{T}, v::Integer) where {T<:Integer}
+    if v ∉ keys(state.distance)
+        error("atom $atom is not in the shortest path. ")
+    end
+
+    return state.distance[v]
+end
+
+function bfs_shortestpath(
+    g::TopologyGraph{T, U},
+    start::Integer,
+    finish::AbstractVector{T1},
+    area::AbstractVector{T2} = vertices(g)
+) where {T<:Integer, U<:Real, T1 <:Integer, T2 <:Integer} # -> path::Vector{Vector{T}}
+    if isempty(finish)
+        error("empty target atoms ")
+    elseif isempty(area)
+        error("empty area. ")
+    elseif !has_vertex(g, start)
+        error("start node $start is out of range. ")
+    elseif !_unique_and_sorted(area)
+        error("area must be unique and sorted. ")
+    elseif !_unique_and_sorted(finish)
+        error("target atoms for shortest path must be unique and sorted. ")
+    elseif !_issubset_sorted(area, vertices(g))
+        error("area must be a subset of vertices.")
+    elseif !_issubset_sorted(finish, area)
+        error("target atoms for shortest path must be a subset of area.")
+    elseif (length(finish)==1 && start == finish[1]) || nv(g) == 1
+        return BFShotestState{T}(
+            Dict{T, T}(start => 0),
+            Dict{T, T}(start => start)
+        )
+    end
+
+    # dists[v] == distance from `start` to each v in `finish`
+    dists = Dict{T, T}(start => 0)
+
+    # predecessor[v] == predecessor of each v in `finish` in BFS
+    predecessor = Dict{T, T}(start => start)
+
+    buffer = T[start]
+    num_reached = insorted(start, finish) ? 1 : 0
+    while !isempty(buffer) && num_reached < length(finish)
+        v = popfirst!(buffer)
+
+        for nbr in _neighbors(g, v)
+            if nbr ∉ keys(predecessor) # not values(predecessor)
+                push!(buffer, nbr)
+                predecessor[nbr] = v
+                if insorted(nbr, finish)
+                    dists[nbr] = dists[v] + 1
+                    num_reached += 1
+                end
+            end
+        end
+    end
+
+    return BFShotestState{T}(dists, predecessor)
+end
+
 
 function neighborhood(
     g::TopologyGraph{T, U},

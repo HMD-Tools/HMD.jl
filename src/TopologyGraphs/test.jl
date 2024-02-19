@@ -211,11 +211,27 @@ rng = Xoshiro(1)
     @test_throws ErrorException bfs_shortestpath(g, 1, [20,1,4,6,8])
     @test_throws ErrorException bfs_shortestpath(g, 1, [1,4,6,8,20], [1,4,8,20])
 
-    @test bfs_shortestpath(g, 1, 1) == [[1]]
-    @test bfs_shortestpath(g, 1, [1]) == [[1]]
-    @test bfs_shortestpath(g, 1, [1, 2]) == [[1], [1, 2]]
-    @test bfs_shortestpath(g, 2, [1, 2]) == [[2, 1], [2]]
-    @test bfs_shortestpath(g, 2, [1, 2, 3]) == [[2, 1], [2], [2, 3]]
+    @testset let x = bfs_shortestpath(g, 1, 1)
+        @test getdist(x, 1) == 0
+        @test getpath(x, 1) == [1]
+    end
+    @testset let x = bfs_shortestpath(g, 1, [1])
+        @test getdist(x, 1) == 0
+        @test getpath(x, 1) == [1]
+    end
+    @testset let x = bfs_shortestpath(g, 1, [1, 2])
+        @test getdist(x, 1) == 0
+        @test getpath(x, 1) == [1]
+        @test getdist(x, 2) == 1
+        @test getpath(x, 2) == [1,1]
+    end
+    @testset let x = bfs_shortestpath(g, 2, [1, 2])
+        @test getdist(x, 1) == 1
+        @test getpath(x, 1) == [2, 1]
+        @test getdist(x, 2) == 0
+        @test getpath(x, 2) == [2]
+    end
+    @testset let bfs_shortestpath(g, 2, [1, 2, 3]) == [[2, 1], [2], [2, 3]]
     result = bfs_shortestpath(g, 1, sort(shortest_path))
     result_noncennect = let
         _g = deepcopy(g)

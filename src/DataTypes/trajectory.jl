@@ -372,11 +372,11 @@ function wrapped(st::SubTrajectory{D, F, S, L, R}) where {D, F<:AbstractFloat, S
 end
 
 function latest_reaction(st::SubTrajectory{D, F, S, L, R}, index::Integer) where {D, F<:AbstractFloat, S<:AbstractSystemType, L, R<:OrdinalRange}
-    if index ∉ st.traj_range
+    if index ∉ 1:length(st)
         error("index $index ∉ $(st.traj_range)")
     end
 
     # find `i` s.t. traj.reactions[i] <= index < traj.reactions[i+1]
-    ii = searchsortedlast(st.traj.reactions, index)
+    ii = searchsortedlast(st.traj.reactions, traj_range[index])
     return st.traj.reactions[ii]
 end
