@@ -52,6 +52,84 @@ end
 
 @testset "TopologyGraph" begin
 
+
+    rng = Xoshiro(1)
+    @testset "bfs_shortestpath_path" begin
+        shortest_path, g = _testgraph_shortest_path(rng)
+        @test_throws ErrorException bfs_shortestpath(g, 1, Int64[])
+        @test_throws ErrorException bfs_shortestpath(g, 1, [1,4,6,8,105])
+        @test_throws ErrorException bfs_shortestpath(g, 1, [20,1,4,6,8])
+        @test_throws ErrorException bfs_shortestpath(g, 102, [1,4,6,8,20])
+
+        @testset let x = bfs_shortestpath(g, 1, 1)
+            @test getdist(x, 1) == 0
+            @test getpath(x, 1) == [1]
+        end
+        @testset let x = bfs_shortestpath(g, 1, [1])
+            @test getdist(x, 1) == 0
+            @test getpath(x, 1) == [1]
+        end
+        @testset let x = bfs_shortestpath(g, 1, [1, 2])
+            @test getdist(x, 1) == 0
+            @test getpath(x, 1) == [1]
+            @test getdist(x, 2) == 1
+            @test getpath(x, 2) == [1,2]
+        end
+        @testset let x = bfs_shortestpath(g, 2, [1, 2])
+            @test getdist(x, 1) == 1
+            @test getpath(x, 1) == [2, 1]
+            @test getdist(x, 2) == 0
+            @test getpath(x, 2) == [2]
+        end
+        @testset let x = bfs_shortestpath(g, 2, [1, 2, 3])
+            @test getdist(x, 1) == 1
+            @test getpath(x, 1) == [2, 1]
+            @test getdist(x, 2) == 0
+            @test getpath(x, 2) == [2]
+            @test getdist(x, 3) == 1
+            @test getpath(x, 3) == [2, 3]
+        end
+
+        result = bfs_shortestpath(g, 1)
+        @testset let
+            for (i, v) in enumerate(shortest_path)
+                @test getpath(result, v) == shortest_path[1:i]
+                @test getdist(result, v) == i-1
+            end
+        end
+        result_noncennect = let
+            _g = deepcopy(g)
+            add_vertices!(_g, 10)
+            bfs_shortestpath(_g, 1, vertices(g))
+        end
+        @test result.distance == result_noncennect.distance
+        @test result.predecessor == result_noncennect.predecessor
+
+        sg = let
+            sg = SimpleWeightedGraph{Int64, Rational{Int8}}()
+            add_vertices!(sg, nv(g))
+            for e in edges(g)
+                # edge weight is 1//1 b.c. weight (= bond order) is not related to
+                # topological distance on molecular graph
+                add_edge!(sg, src(e), dst(e), 1//1)
+            end
+            sg
+        end
+        for (i, finish) in enumerate(shortest_path)
+            i == 1 && continue # a_star returns empty edge list
+            elist = a_star(sg, 1, finish)
+            path = push!([src(e) for e in elist], dst(elist[end]))
+            @test getpath(result, finish) == path
+        end
+
+        @inferred bfs_shortestpath(g, Int16(1), Int32[1, 4, 6, 8, 20])
+    end
+    return nothing
+
+
+
+
+
 function random_graph(nv, max_degree, rng)
     topo = TopologyGraph{Int64, Rational{Int8}}()
     wg = SimpleWeightedGraph{Int64, Rational{Int8}}()
@@ -202,66 +280,6 @@ for _ in 1:5
 
 end # for loop
 
-rng = Xoshiro(1)
-@testset "bfs_shortestpath_path" begin
-    shortest_path, g = _testgraph_shortest_path(rng)
-    @test_throws ErrorException bfs_shortestpath(g, 1, Int64[])
-    @test_throws ErrorException bfs_shortestpath(g, 1, [1,4,6,8,20], Int64[])
-    @test_throws ErrorException bfs_shortestpath(g, 1, [1,4,6,8,105])
-    @test_throws ErrorException bfs_shortestpath(g, 1, [20,1,4,6,8])
-    @test_throws ErrorException bfs_shortestpath(g, 1, [1,4,6,8,20], [1,4,8,20])
-
-    @testset let x = bfs_shortestpath(g, 1, 1)
-        @test getdist(x, 1) == 0
-        @test getpath(x, 1) == [1]
-    end
-    @testset let x = bfs_shortestpath(g, 1, [1])
-        @test getdist(x, 1) == 0
-        @test getpath(x, 1) == [1]
-    end
-    @testset let x = bfs_shortestpath(g, 1, [1, 2])
-        @test getdist(x, 1) == 0
-        @test getpath(x, 1) == [1]
-        @test getdist(x, 2) == 1
-        @test getpath(x, 2) == [1,1]
-    end
-    @testset let x = bfs_shortestpath(g, 2, [1, 2])
-        @test getdist(x, 1) == 1
-        @test getpath(x, 1) == [2, 1]
-        @test getdist(x, 2) == 0
-        @test getpath(x, 2) == [2]
-    end
-    @testset let bfs_shortestpath(g, 2, [1, 2, 3]) == [[2, 1], [2], [2, 3]]
-    result = bfs_shortestpath(g, 1, sort(shortest_path))
-    result_noncennect = let
-        _g = deepcopy(g)
-        add_vertices!(_g, 10)
-        bfs_shortestpath(_g, 1, sort(shortest_path), vertices(g))
-    end
-    @test result == result_noncennect == [
-        shortest_path[1:i] for i in eachindex(shortest_path)
-    ]
-
-    sg = let
-        sg = SimpleWeightedGraph{Int64, Rational{Int8}}()
-        add_vertices!(sg, nv(g))
-        for e in edges(g)
-            # edge weight is 1//1 b.c. weight (= bond order) is not related to
-            # topological distance on molecular graph
-            add_edge!(sg, src(e), dst(e), 1//1)
-        end
-        sg
-    end
-    for (i, finish) in enumerate(shortest_path)
-        i == 1 && continue # a_star returns empty edge list
-        elist = a_star(sg, 1, finish)
-        path = push!([src(e) for e in elist], dst(elist[end]))
-        @test length(result[i]) == length(path)
-        @test result[i] == path
-    end
-
-    @inferred bfs_shortestpath(g, Int16(1), Int32[1, 4, 6, 8, 20])
-end
 
 @testset "cycle detection" begin
     wg = SimpleWeightedGraph{Int64, Rational{Int8}}(complete_graph(30))

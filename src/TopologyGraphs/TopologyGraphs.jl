@@ -28,7 +28,7 @@ export TopologyGraph
 export TopologyEdge, TopologyGraphEdge
 export weight, weighttype, get_weight, degree_matrix
 
-export bfs_shortestpath, BFShortestState, getpath, getdist
+export bfs_shortestpath, BFShortestState, getpath, getdist, farthest
 
 include("topologyedge.jl")
 include("topologygraph.jl")

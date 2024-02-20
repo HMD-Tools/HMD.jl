@@ -517,15 +517,6 @@ function SimpleWeightedGraphs.connected_components(
     return ccs
 end
 
-function bfs_shortestpath(
-    g::TopologyGraph{T, U},
-    start::Integer,
-    finish::Integer,
-    area::AbstractVector{T1} = vertices(g)
-) where {T<:Integer, U<:Real, T1<:Integer}
-    return bfs_shortestpath(g, start, [finish], area)
-end
-
 function _bfs_shortestpath(
     g::TopologyGraph{T, U},
     start::Integer,
@@ -601,84 +592,90 @@ end
 
 
 struct BFShotestState{T<:Integer}
+    start::T
     distance::Dict{T, T} # distance[v] == distance from `start` to v
     predecessor::Dict{T, T} # predecessor[v] == predecessor of v in BFS
 end
 
-function getpath(state::BFShotestState{T}, v::Integer) where {T<:Integer}
-    if v ∉ keys(state.distance)
-        error("atom $atom is not in the shortest path. ")
-    end
-
-    path = T[v]
-    u = v
-    while u != state.predecessor[u]
-        u = state.predecessor[u]
-        pushfirst!(path, u)
-    end
-
-    return path
-end
-
 function getdist(state::BFShotestState{T}, v::Integer) where {T<:Integer}
-    if v ∉ keys(state.distance)
-        error("atom $atom is not in the shortest path. ")
+    if !haskey(state.distance, v)
+        error("vertex $v is not in the shortest path. ")
     end
 
     return state.distance[v]
 end
 
+function getpath(state::BFShotestState{T}, v::Integer) where {T<:Integer}
+    if !haskey(state.predecessor, v)
+        error("vertex $v is not in the shortest path. ")
+    end
+
+    path = Vector{T}(undef, state.distance[v]+1)
+    path[end] = v
+    for i in reverse(1:length(path)-1)
+        path[i] = state.predecessor[path[i+1]]
+    end
+    @assert path[1] == state.start
+
+    return path
+end
+
+function farthest(state::BFShotestState{T}) where {T<:Integer}
+    return argmax(state.distance)
+end
+
 function bfs_shortestpath(
     g::TopologyGraph{T, U},
     start::Integer,
-    finish::AbstractVector{T1},
-    area::AbstractVector{T2} = vertices(g)
-) where {T<:Integer, U<:Real, T1 <:Integer, T2 <:Integer} # -> path::Vector{Vector{T}}
-    if isempty(finish)
-        error("empty target atoms ")
-    elseif isempty(area)
+    finish::Integer
+) where {T<:Integer, U<:Real}
+    return bfs_shortestpath(g, start, [finish])
+end
+
+function bfs_shortestpath(
+    g::TopologyGraph{T, U},
+    start::Integer,
+    area::AbstractVector{T1} = vertices(g)
+) where {T<:Integer, U<:Real, T1 <:Integer}
+    if isempty(area)
         error("empty area. ")
     elseif !has_vertex(g, start)
         error("start node $start is out of range. ")
     elseif !_unique_and_sorted(area)
         error("area must be unique and sorted. ")
-    elseif !_unique_and_sorted(finish)
-        error("target atoms for shortest path must be unique and sorted. ")
     elseif !_issubset_sorted(area, vertices(g))
         error("area must be a subset of vertices.")
-    elseif !_issubset_sorted(finish, area)
-        error("target atoms for shortest path must be a subset of area.")
-    elseif (length(finish)==1 && start == finish[1]) || nv(g) == 1
+    elseif !insorted(start, area)
+        error("start vertex must be in area. ")
+    elseif length(area) == 1 || nv(g) == 1
         return BFShotestState{T}(
+            start,
             Dict{T, T}(start => 0),
             Dict{T, T}(start => start)
         )
     end
 
-    # dists[v] == distance from `start` to each v in `finish`
+    # dists[v] == distance from `start` to each v in `area`
     dists = Dict{T, T}(start => 0)
 
-    # predecessor[v] == predecessor of each v in `finish` in BFS
+    # predecessor[v] == predecessor of each v in `area` in BFS
     predecessor = Dict{T, T}(start => start)
 
     buffer = T[start]
-    num_reached = insorted(start, finish) ? 1 : 0
-    while !isempty(buffer) && num_reached < length(finish)
+    while !isempty(buffer) && length(predecessor) < length(area)
         v = popfirst!(buffer)
+        next_depth = dists[v] + 1
 
         for nbr in _neighbors(g, v)
-            if nbr ∉ keys(predecessor) # not values(predecessor)
+            if nbr ∉ keys(predecessor) && insorted(nbr, area)
                 push!(buffer, nbr)
+                dists[nbr] = next_depth
                 predecessor[nbr] = v
-                if insorted(nbr, finish)
-                    dists[nbr] = dists[v] + 1
-                    num_reached += 1
-                end
             end
         end
     end
 
-    return BFShotestState{T}(dists, predecessor)
+    return BFShotestState{T}(start, dists, predecessor)
 end
 
 

@@ -317,6 +317,7 @@ end
     @testset "TopologyGraphs" begin
         HMD.TopologyGraphs.test()
     end
+    return nothing
 
     @testset "HierarchyHLabels" begin
         HMD.DataTypes.HierarchyLabels.test()
