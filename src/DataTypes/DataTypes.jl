@@ -279,8 +279,11 @@ function box(s::System{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:A
     s.box
 end
 
-function set_box!(s::System, box::BoundingBox)
-    s.box = box
+function set_box!(
+    s::System{D, F, SysType, L},
+    box::BoundingBox{D, T, L}
+) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L, T<:AbstractFloat}
+    s.box = BoundingBox{D, F, L}(box.origin, box.axis)
 end
 
 function element_type(s::System)
