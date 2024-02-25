@@ -13,6 +13,12 @@ function TopologyGraph{T, U}(g::AbstractGraph{T}) where {T, U}
     return tg
 end
 
+function ==(g1::TopologyGraph{T, U}, g2::TopologyGraph{T, U}) where {T<:Integer, U<:Real}
+    return all(eachindex(g1.adjlist)) do i
+        g1.adjlist[i] == g2.adjlist[i] && g1.weights[i] == g2.weights[i]
+    end
+end
+
 Base.zero(g::TopologyGraph{T, U}) where {T<:Integer, U<:Real} = TopologyGraph{T, U}()
 Base.zero(::Type{TopologyGraph{T, U}}) where {T<:Integer, U<:Real} = TopologyGraph{T, U}()
 

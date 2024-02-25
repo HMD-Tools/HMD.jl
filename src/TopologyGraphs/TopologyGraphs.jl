@@ -1,5 +1,8 @@
 module TopologyGraphs
 
+import Base: ==
+export ==
+
 using DataStructures
 using Distributions
 using Logging
