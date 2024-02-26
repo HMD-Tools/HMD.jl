@@ -377,6 +377,6 @@ function latest_reaction(st::SubTrajectory{D, F, S, L, R}, index::Integer) where
     end
 
     # find `i` s.t. traj.reactions[i] <= index < traj.reactions[i+1]
-    ii = searchsortedlast(st.traj.reactions, traj_range[index])
+    ii = searchsortedlast(st.traj.reactions, st.traj_range[index])
     return st.traj.reactions[ii]
 end
