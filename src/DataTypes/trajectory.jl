@@ -219,13 +219,15 @@ function similar_system(
 ) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     s = System{D, precision, SysType}()
 
-    if reserve_dynamic
+    return if reserve_dynamic
         import_dynamic!(s, traj, 1)
+        deepcopy(s)
     elseif reserve_static
         import_static!(s, traj, 1)
+        deepcopy(s)
+    else
+        s
     end
-
-    return deepcopy(s)
 end
 
 function dimension(traj::Trajectory{D, F, SysType, L}) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
