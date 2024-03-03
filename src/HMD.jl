@@ -40,6 +40,7 @@ export
     similar,
     show,
     natom,
+    eachatom,
     nbond,
     time,
     set_time!,

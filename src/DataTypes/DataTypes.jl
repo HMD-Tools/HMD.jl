@@ -41,6 +41,7 @@ using ..TopologyGraphs
     similar,
     show,
     natom,
+    eachatom,
     nbond,
     time,
     set_time!,
@@ -254,6 +255,8 @@ function natom(s::System)
     natm = length(s.position)
     return natm
 end
+
+eachatom(s::System) = 1:natom(s)
 
 function nbond(s::System)
     return topology(s) |> ne
