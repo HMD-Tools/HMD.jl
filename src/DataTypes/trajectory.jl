@@ -71,6 +71,8 @@ function getindex(traj::AbstractTrajectory{D, F, SysType}, index::Integer) where
     set_time!(replica, time(current))
     set_box!(replica, deepcopy(box(current)))
     replica.position = all_positions(current) |> deepcopy
+    replica.velocity = deepcopy(current.velocity)
+    replica.force = deepcopy(current.force)
     replica.travel = deepcopy(current.travel)
 
     # others
@@ -141,6 +143,8 @@ function add_snapshot!(
         set_time!(replica, time(s))
         replica.position = all_positions(s)
         replica.travel = s.travel
+        replica.velocity = s.velocity
+        replica.force = s.force
         replica.wrapped = s.wrapped
         push!(traj.systems, replica)
     end
@@ -182,6 +186,8 @@ function import_dynamic!(reader::System{D, F, S1}, traj::Trajectory{D, F, S2}, i
     set_time!(reader, time(s))
     set_box!(reader, box(s))
     reader.position = all_positions(s)
+    reader.velocity = s.velocity
+    reader.force = s.force
     reader.travel = s.travel
     reader.wrapped = s.wrapped
 
