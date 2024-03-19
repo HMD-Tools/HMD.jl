@@ -140,7 +140,7 @@ function h5traj(
     precision::Type{<:AbstractFloat} = F
 ) where {D, F<:AbstractFloat, S<:AbstractSystemType, L}
     file_handler = H5traj(h5open(name, mode))
-    if mode in ("r", "w+") || (mode == "cw" && isfile(name))
+    if mode in ("r", "r+") || (mode == "cw" && isfile(name))
         error("if you want to read or append existing HMD file, use h5traj(name, mode)")
     end
     file = get_file(file_handler)
@@ -227,13 +227,17 @@ function add_snapshot!(
         _error_chk(file_handler, s)
     end
 
+    file = get_file(file_handler)
+    if isempty(file["topology"])
+        reaction = true
+    end
+
     change_wrap = false
     if wrapped(s)
         @warn "wrapping is not supported yet. unwrapping..."
         change_wrap = true
     end
 
-    file = get_file(file_handler)
     if reaction
         if nv(topology(s))==0 && isempty(all_elements(s))
             error("system's topology and elements are empty. ")

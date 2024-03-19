@@ -19,6 +19,11 @@ end
 function Base.show(
     io::IO, ::MIME"text/plain", traj::Trajectory{D, F, S, L}
 ) where {D, F<:AbstractFloat, S<:AbstractSystemType, L}
+    if isempty(traj.systems)
+        println("empty Trajectory{$D, $F, $S, $L}")
+        return nothing
+    end
+
     initial = @sprintf "%0.3e" time(traj.systems[1])
     final = @sprintf "%0.3e" time(traj.systems[end])
     "Trajectory{$D, $F, $S, $L}
