@@ -515,7 +515,7 @@ function SimpleWeightedGraphs.connected_components(
                 push!(cc, nbr)
                 push!(buffer, nbr)
             end
-            deleat!(unvisited, current)
+            delete!(unvisited, current)
         end
         push!(ccs, (sort!∘collect)(cc))
     end
@@ -760,7 +760,7 @@ function _insertsorted!(vec::AbstractVector{T}, x::U) where {T<:Real, U<:Real}
     return vec
 end
 
-function _deleatsorted!(vec::AbstractVector{T}, x::U) where {T<:Real, U<:Real}
+function _deletesorted!(vec::AbstractVector{T}, x::U) where {T<:Real, U<:Real}
     i = searchsortedfirst(vec, x)
     if i > length(vec)
         return nothing

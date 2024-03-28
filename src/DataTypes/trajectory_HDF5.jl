@@ -23,6 +23,20 @@ function _get_snap(props::HDF5.Dataset, i::Integer, Natom::Integer, D::Integer, 
     return reinterpret(SVector{D, F}, arr)
 end
 
+# ここを作る！
+# TODO: IOの中間メモリ確保量の低減(Serialized typeがなくなってロジックだけになるので可読性確保の工夫が必要)
+function _get_substructure(props::HDF5.Dataset, label::HLabel, Natom::Integer, D::Integer, F::Type{<:AbstractFloat})
+    if D <= 0
+        error("dimension D must be >= 1. ")
+    end
+
+    start = D * (i-1) * Natom + 1
+    stop = D * i * Natom
+
+    arr::Vector{F} = props[start:stop, 1]
+    return reinterpret(SVector{D, F}, arr)
+end
+
 struct SerializedTopology
     num_node::Int64
     edges_org::Vector{Int64}
