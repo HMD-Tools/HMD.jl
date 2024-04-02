@@ -633,14 +633,6 @@ end
 function bfs_shortestpath(
     g::TopologyGraph{T, U},
     start::Integer,
-    finish::Integer
-) where {T<:Integer, U<:Real}
-    return bfs_shortestpath(g, start, [finish])
-end
-
-function bfs_shortestpath(
-    g::TopologyGraph{T, U},
-    start::Integer,
     area::AbstractVector{T1} = vertices(g)
 ) where {T<:Integer, U<:Real, T1 <:Integer}
     if isempty(area)

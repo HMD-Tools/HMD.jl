@@ -130,8 +130,12 @@ function insert_relation!(
 )
     lh = hierarchy(s, hname)
 
+    result = _remove_relation!(lh, super, sub)
+    @match result begin
+        Relation_Missing => error("relation between super and sub not found. ")
+        Success          => nothing
+    end
     add_label!(s, hname, label)
-    _remove_relation!(lh, super, sub)
     add_relation!(s, hname; super=super, sub=label, unsafe=unsafe)
     add_relation!(s, hname; super=label, sub=sub, unsafe=unsafe)
 
