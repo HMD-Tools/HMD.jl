@@ -13,6 +13,11 @@ function TopologyGraph{T, U}(g::AbstractGraph{T}) where {T, U}
     return tg
 end
 
+function empty!(g::TopologyGraph{T, U}) where {T<:Integer, U<:Real}
+    g.adjlist = Vector{Vector{T}}()
+    g.weights = Vector{Vector{U}}()
+end
+
 function ==(g1::TopologyGraph{T, U}, g2::TopologyGraph{T, U}) where {T<:Integer, U<:Real}
     return all(eachindex(g1.adjlist)) do i
         g1.adjlist[i] == g2.adjlist[i] && g1.weights[i] == g2.weights[i]
@@ -51,10 +56,17 @@ function SimpleWeightedGraphs.has_edge(
     v::Integer,
     w::Integer
 ) where {T<:Integer, U<:Real}
-    if isempty(g.adjlist)
-        return false
-    elseif has_vertex(g, v) && has_vertex(g, w)
-        isempty(g.adjlist[v]) && return false
+    #if isempty(g.adjlist)
+    #    return false
+    #elseif has_vertex(g, v) && has_vertex(g, w)
+    #    isempty(g.adjlist[v]) && return false
+    #    hasedge = w ∈ g.adjlist[v]
+    #    @assert hasedge == (v ∈ g.adjlist[w])
+    #    return hasedge
+    #else
+    #    return false
+    #end
+    if has_vertex(g, v) && has_vertex(g, w)
         hasedge = w ∈ g.adjlist[v]
         @assert hasedge == (v ∈ g.adjlist[w])
         return hasedge

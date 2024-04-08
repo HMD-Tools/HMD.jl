@@ -143,15 +143,19 @@ function add_snapshot!(
         push!(traj.systems, s)
         push!(traj.reactions, length(traj.systems))
     else
-        replica = System{D, F, SysType}()
-        set_box!(replica, box(s))
-        set_time!(replica, time(s))
-        replica.position = all_positions(s)
-        replica.travel = s.travel
-        replica.velocity = s.velocity
-        replica.force = s.force
-        replica.wrapped = s.wrapped
-        push!(traj.systems, replica)
+        #replica = System{D, F, SysType}()
+        #set_box!(replica, box(s))
+        #set_time!(replica, time(s))
+        #replica.position = all_positions(s)
+        #replica.travel = s.travel
+        #replica.velocity = s.velocity
+        #replica.force = s.force
+        #replica.wrapped = s.wrapped
+        #push!(traj.systems, replica)
+        empty!(s.topology)
+        empty!(s.hierarchy)
+        empty!(s.element)
+        push!(traj.systems, s)
     end
 
     return nothing
@@ -229,15 +233,12 @@ function similar_system(
     reserve_static = false
 ) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
     s = System{D, precision, SysType}()
-
-    return if reserve_dynamic
-        import_dynamic!(s, traj, 1)
-        deepcopy(s)
-    elseif reserve_static
-        import_static!(s, traj, 1)
-        deepcopy(s)
-    else
+    return if !reserve_dynamic && !reserve_static
         s
+    else
+        reserve_dynamic && import_dynamic!(s, traj, 1)
+        reserve_static && import_static!(s, traj, 1)
+        deepcopy(s)
     end
 end
 

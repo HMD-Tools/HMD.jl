@@ -217,6 +217,12 @@ function system_type(s::System{D, F, SysType, L}) where {D, F<:AbstractFloat, Sy
     return SysType
 end
 
+function _mycopy(v::Vector{T}) where {T}
+    x = Vector{T}(undef, length(v))
+    @inbounds x .= v
+    return x
+end
+
 function Base.similar(
     s::System{D, F, SysType, L},
     precision::Type{<:AbstractFloat} = F;

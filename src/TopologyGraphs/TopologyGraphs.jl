@@ -1,7 +1,7 @@
 module TopologyGraphs
 
-import Base: ==
-export ==
+import Base: ==, empty!
+export ==, empty!
 
 using DataStructures
 using Distributions

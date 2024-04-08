@@ -18,7 +18,10 @@ function BoundingBox{D, F}(origin::AbstractVector{T}, axis::AbstractMatrix{T}) w
 end
 
 function BoundingBox{D, F}() where {D, F<:AbstractFloat}
-    BoundingBox{D, F, D*D}(zeros(F, 3), Matrix{F}(I, D, D))
+    BoundingBox{D, F, D*D}(
+        zero(SVector{D, F}),
+        one(SMatrix{3, 3, Float64,9})
+    )
 end
 
 function BoundingBox{D, F}(origin::AbstractVector{T}, axis::AbstractMatrix{T}) where {D, F<:AbstractFloat, T<:Unitful.Length}
