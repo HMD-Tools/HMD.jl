@@ -14,8 +14,7 @@ function TopologyGraph{T, U}(g::AbstractGraph{T}) where {T, U}
 end
 
 function empty!(g::TopologyGraph{T, U}) where {T<:Integer, U<:Real}
-    g.adjlist = Vector{Vector{T}}()
-    g.weights = Vector{Vector{U}}()
+    TopologyGraph{T, U}()
 end
 
 function ==(g1::TopologyGraph{T, U}, g2::TopologyGraph{T, U}) where {T<:Integer, U<:Real}

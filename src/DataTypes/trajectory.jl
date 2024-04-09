@@ -44,7 +44,8 @@ function empty_trajectory(
 end
 
 function is_reaction(traj::Trajectory{D, F, SysType, L}, index::Integer) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}
-    return index ∈ traj.reactions
+    #return index ∈ traj.reactions
+    return insorted(index, traj.reactions)
 end
 
 function get_system(traj::Trajectory{D, F, SysType, L}, index::Integer) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, L}

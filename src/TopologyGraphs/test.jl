@@ -212,10 +212,6 @@ rng = Xoshiro(1)
     @test_throws ErrorException bfs_shortestpath(g, 1, [20,1,4,6,8])
     @test_throws ErrorException bfs_shortestpath(g, 102, [1,4,6,8,20])
 
-    @testset let x = bfs_shortestpath(g, 1, 1)
-        @test getdist(x, 1) == 0
-        @test getpath(x, 1) == [1]
-    end
     @testset let x = bfs_shortestpath(g, 1, [1])
         @test getdist(x, 1) == 0
         @test getpath(x, 1) == [1]

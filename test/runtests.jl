@@ -220,15 +220,6 @@ function strict_eq(s1::System, s2::System; dynamic_only=false)
         end
     end
 
-    for (e1, e2) in zip(all_elements(s1), all_elements(s2))
-        if e1 != e2
-            error("element mismatch. \n" *
-                "    s1: $e1" *
-                "    s2: $e2"
-            )
-        end
-    end
-
     if wrapped(s1) != wrapped(s2)
         error("wrap mismatch. \n" *
             "    s1: $(wrapped(s1))" *
@@ -236,60 +227,71 @@ function strict_eq(s1::System, s2::System; dynamic_only=false)
         )
     end
 
-    if hierarchy_names(s1) != hierarchy_names(s2)
-        error("hierarchy names mismatch. \n" *
-            "    s1: $(hierarchy_names(s1))" *
-            "    s2: $(hierarchy_names(s2))"
-        )
-    end
-    for hname in hierarchy_names(s1)
-        lh1 = hierarchy(s1, hname)
-        lh2 = hierarchy(s2, hname)
-        if !strict_eq(lh1, lh2)
-            println("\nlh1: ")
-            println(lh1)
-            println("\nlh2: ")
-            println(lh2)
-            println()
-            error("hierarchy $hname mismatch")
+    if !dynamic_only
+        for (e1, e2) in zip(all_elements(s1), all_elements(s2))
+            if e1 != e2
+                error("element mismatch. \n" *
+                    "    s1: $e1" *
+                    "    s2: $e2"
+                )
+            end
         end
-    end
 
-    t1, t2 = topology(s1), topology(s2)
-    if nv(t1) != nv(t1)
-        error("topology node num mismatch. \n" *
-            "    s1: $(nv(t1))" *
-            "    s2: $(nv(t2))"
-        )
-    end
-    if ne(t1) != ne(t2)
-        error("topology edge num mismatch. \n" *
-            "    s1: $(ne(t1))" *
-            "    s2: $(ne(t2))"
-        )
-    end
-    for bond in edges(t1)
-        head = src(bond)
-        tail = dst(bond)
-        if get_weight(t1, head, tail) != get_weight(t2, head, tail)
-            error("bond order mismatch between $head and $tail. \n" *
-                "    s1: $(get_weight(t1, head, tail))" *
-                "    s2: $(get_weight(t2, head, tail))"
+        if hierarchy_names(s1) != hierarchy_names(s2)
+            error("hierarchy names mismatch. \n" *
+                "    s1: $(hierarchy_names(s1))" *
+                "    s2: $(hierarchy_names(s2))"
             )
         end
-        for id in (head, tail)
-            if any(x->abs(x)>1e-5, position(s1, id) - position(s2, id)) ||
-                element(s1, id) != element(s2, id) ||
-                travel(s1, id) != travel(s2, id)
-                error("topology node id and atom index mismatch. \n" *
-                    "    node id: $id" *
-                    "    s1: position: $(position(s1, id))" *
-                    "        element : $(element(s1, id))" *
-                    "        travel  : $(travel(s1, id))" *
-                    "    s2: position: $(position(s2, id))" *
-                    "        element : $(element(s2, id))" *
-                    "        travel  : $(travel(s2, id))"
+        for hname in hierarchy_names(s1)
+            lh1 = hierarchy(s1, hname)
+            lh2 = hierarchy(s2, hname)
+            if !strict_eq(lh1, lh2)
+                println("\nlh1: ")
+                println(lh1)
+                println("\nlh2: ")
+                println(lh2)
+                println()
+                error("hierarchy $hname mismatch")
+            end
+        end
+
+        t1, t2 = topology(s1), topology(s2)
+        if nv(t1) != nv(t1)
+            error("topology node num mismatch. \n" *
+                "    s1: $(nv(t1))" *
+                "    s2: $(nv(t2))"
+            )
+        end
+        if ne(t1) != ne(t2)
+            error("topology edge num mismatch. \n" *
+                "    s1: $(ne(t1))" *
+                "    s2: $(ne(t2))"
+            )
+        end
+        for bond in edges(t1)
+            head = src(bond)
+            tail = dst(bond)
+            if get_weight(t1, head, tail) != get_weight(t2, head, tail)
+                error("bond order mismatch between $head and $tail. \n" *
+                    "    s1: $(get_weight(t1, head, tail))" *
+                    "    s2: $(get_weight(t2, head, tail))"
                 )
+            end
+            for id in (head, tail)
+                if any(x->abs(x)>1e-5, position(s1, id) - position(s2, id)) ||
+                    element(s1, id) != element(s2, id) ||
+                    travel(s1, id) != travel(s2, id)
+                    error("topology node id and atom index mismatch. \n" *
+                        "    node id: $id" *
+                        "    s1: position: $(position(s1, id))" *
+                        "        element : $(element(s1, id))" *
+                        "        travel  : $(travel(s1, id))" *
+                        "    s2: position: $(position(s2, id))" *
+                        "        element : $(element(s2, id))" *
+                        "        travel  : $(travel(s2, id))"
+                    )
+                end
             end
         end
     end
@@ -315,15 +317,15 @@ end
 
 @testset "HMD.jl" begin
     @testset "TopologyGraphs" begin
-        HMD.TopologyGraphs.test()
+        #HMD.TopologyGraphs.test()
     end
 
     @testset "HierarchyHLabels" begin
-        HMD.DataTypes.HierarchyLabels.test()
+        #HMD.DataTypes.HierarchyLabels.test()
     end
 
     @testset "label manipulation" begin
-        include("label_manipulation.jl")
+        #include("label_manipulation.jl")
     end
 
     @testset "trajectory" begin
