@@ -356,7 +356,7 @@ function Base.iterate(
         import_static!(reader, st.traj, rp)
         import_dynamic!(reader, st.traj, real_idx)
         #return (step=get_timestep(st.traj, real_idx), snap=reader), (pseude_idx+1, reader)
-        return snap=reader, (pseude_idx+1, reader)
+        return reader, (pseude_idx+1, reader)
     else
         return nothing
     end
