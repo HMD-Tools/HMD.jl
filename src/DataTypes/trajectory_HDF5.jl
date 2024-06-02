@@ -23,7 +23,7 @@ function _get_snap(props::HDF5.Dataset, i::Integer, Natom::Integer, D::Integer, 
     return reinterpret(SVector{D, F}, arr)
 end
 
-# ここを作る！
+
 # TODO: IOの中間メモリ確保量の低減(Serialized typeがなくなってロジックだけになるので可読性確保の工夫が必要)
 function _get_substructure(props::HDF5.Dataset, label::HLabel, Natom::Integer, D::Integer, F::Type{<:AbstractFloat})
     if D <= 0
@@ -333,7 +333,7 @@ function _add_box!(file, bbox, index, D)
     return nothing
 end
 
-struct H5trajReader{F<:AbstractFloat}
+struct H5trajReader{D, F, S, L}
     file::HDF5.File
     times::Vector{F}
     elems::Vector{Atomic_Number_Precision}
@@ -347,7 +347,7 @@ struct H5trajReader{F<:AbstractFloat}
     atomprops::Dict{String, HDF5.Dataset}
 end
 
-function h5traj_reader(name::AbstractString, F::Type{<:AbstractFloat})
+function h5traj_reader(name::AbstractString, D::Integer, F::Type{<:AbstractFloat}, S::Type{<:AbstractSystemType})
     file_handler = h5traj(name, "r")
     file = get_file(file_handler)
 
@@ -391,14 +391,14 @@ function h5traj_reader(name::AbstractString, F::Type{<:AbstractFloat})
     #@assert length(timesteps) == length(times)
     @assert length(reactions) <= length(times)
 
-    return H5trajReader{F}(file, times, elems, reactions, boxes, Nsnap, Natom, has_v, has_f, hnames, atomprops)
+    return H5trajReader{D, F, S, D*D}(file, times, elems, reactions, boxes, Nsnap, Natom, has_v, has_f, hnames, atomprops)
 end
 
 function read_traj(
     name::AbstractString,
     D::Integer, F::Type{<:AbstractFloat}, S::Type{<:AbstractSystemType}
 )
-    hmdfile = h5traj_reader(name, F)
+    hmdfile = h5traj_reader(name, D, F, S)
     traj = Trajectory{D, F, S, D*D}()
     try
         read_traj!(traj, hmdfile)
@@ -411,14 +411,17 @@ end
 
 function read_traj!(
     traj::Trajectory{D, F, S, L},
-    hmdfile::H5trajReader{F}
+    hmdfile::H5trajReader{D, F, S, L}
 ) where {D, F<:AbstractFloat, S<:AbstractSystemType, L}
     #traj.timesteps = hmdfile.timesteps
     traj.reactions = hmdfile.reactions
     traj.systems = [similar_system(traj) for _ in 1:hmdfile.Nsnap]
     # dynamic properties
+    intval = hmdfile.Nsnap ÷ 100
     for i in 1:hmdfile.Nsnap
-        print("progress: $(100*i÷hmdfile.Nsnap)%    \r")
+        if i % intval == 0
+            print("progress: $(100*i÷hmdfile.Nsnap)%    \r")
+        end
         set_time!(traj.systems[i], hmdfile.times[i])
         set_box!(traj.systems[i], _get_snap(hmdfile.boxes, i, D))
         traj.systems[i].travel = zeros(SVector{D, Int16}, hmdfile.Natom)
@@ -444,7 +447,62 @@ function read_traj!(
     return nothing
 end
 
-function import_dynamic!(
+
+function Base.iterate(hmdfile::H5trajReader{D, F, S, L}) where {D, F, S, L}
+    reader = System{D, F, S}()
+    read_snapshot!(reader, hmdfile, 1)
+
+    return reader, (2, reader)
+end
+
+
+function Base.iterate(
+    hmdfile::H5trajReader{D, F, S, L},
+    state::Tuple{Int64, System{D, F, S}}
+) where {D, F, S, L}
+    index, reader = state
+    if index > hmdfile.Nsnap
+        return nothing
+    else
+        read_snapshot!(reader, hmdfile, index)
+        return reader, (index+1, reader)
+    end
+end
+
+
+function read_snapshot!(
+    reader::System{D, F, S, L},
+    hmdfile::H5trajReader{D, F, S, L},
+    index::Integer
+) where {D, F<:AbstractFloat, S<:AbstractSystemType, L}
+    # static property
+    if searchsortedfirst(hmdfile.reactions, index) ≤ length(hmdfile.reactions)
+        reader.topology = _read_topology(hmdfile.file, index)
+        for hname in hmdfile.hnames
+            reader.hierarchy[hname] = _read_hierarchy(hmdfile.file, hname, index)
+        end
+        reader.element = hmdfile.elems
+    end
+
+    #dynamic property
+    set_time!(reader, hmdfile.times[index])
+    set_box!(reader, _get_snap(hmdfile.boxes, index, D))
+    reader.travel = zeros(SVector{D, Int16}, hmdfile.Natom)
+    reader.wrapped = false
+    reader.position = _get_snap(hmdfile.atomprops["position"], index, hmdfile.Natom, D, F)
+    if hmdfile.has_velocity
+        reader.velocity = _get_snap(hmdfile.atomprops["velocity"], index, hmdfile.Natom, D, F)
+    end
+    if hmdfile.has_force
+        reader.force = _get_snap(hmdfile.atomprops["force"], index, hmdfile.Natom, D, F)
+    end
+
+    return nothing
+end
+
+
+
+function _import_dynamic!(
     reader::System{D, F, S, L},
     traj_file::H5traj,
     index::Integer,
@@ -480,7 +538,7 @@ function import_dynamic!(
     return nothing
 end
 
-function import_static!(
+function _import_static!(
     reader::System{D, F, S, L},
     traj_file::H5traj,
     index::Integer;

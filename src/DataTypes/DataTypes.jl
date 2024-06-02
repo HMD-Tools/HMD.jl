@@ -134,7 +134,8 @@ using ..TopologyGraphs
 
     # trajectory io interface
     add_snapshot!,
-    get_metadata
+    get_metadata,
+    h5traj_reader
 
 # core subtype signature
 export Position, BoundingBox, HLabel, LabelHierarchy
@@ -145,7 +146,8 @@ export GeneralSystem, System, print_to_string
 
 # fileIO
 export H5traj, SerializedTopology, PackedHierarchy
-export h5traj, get_file, read_traj
+export h5traj, H5trajReader, get_file, read_traj
+export read_snapshot!
 
 #constants
 export Entire_System, BO_Precision, atom_mass, Atom_Label, Atomic_Number_Precision
@@ -227,8 +229,7 @@ function Base.similar(
     s::System{D, F, SysType, L},
     precision::Type{<:AbstractFloat} = F;
     reserve_dynamic::Bool = false,
-    reserve_static::Bool = false#,
-    #precision::Type{<:AbstractFloat} = F
+    reserve_static::Bool = false
 ) where {D, F<:AbstractFloat, SysType, L}
     sim = System{D, precision, SysType}()
     if reserve_dynamic
@@ -277,7 +278,7 @@ function set_time!(s::System, time::AbstractFloat)
 end
 
 function set_time!(s::System, time::Unitful.Time)
-    s.time = uconvert(u"ns", time)
+    s.time = uconvert(u"ns", time) |> ustrip
 end
 
 function topology(s::System)

@@ -148,3 +148,5 @@ add_snapshot!(
     unsafe::Bool = false
 ) where {D, F<:AbstractFloat} = _NI("add_snapshot!")
 get_metadata(traj_file::AbstractFileFormat) = _NI("get_metadata")
+h5traj_reader(file::AbstractString, D::Integer, F::AbstractString, S::Type{<:AbstractSystemType}) = _NI("h5traj_reader")
+#read_snapshot!(reader::H5trajReader, hmdfile::H5trajReader) = _NI("read_snapshot!")

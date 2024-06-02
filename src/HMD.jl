@@ -128,6 +128,9 @@ export
     # trajectory io interface
     add_snapshot!,
     get_metadata,
+    H5trajReader,
+    h5traj_reader,
+    read_snapshot!,
 
     # System highlevel interfaces
     isatom,
