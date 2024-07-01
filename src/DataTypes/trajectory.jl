@@ -1,5 +1,5 @@
 export Trajectory, SubTrajectory
-export is_reaction, get_system
+export is_reaction, get_system, get_times
 export latest_reaction, add!
 export length
 
@@ -122,6 +122,8 @@ function Base.iterate(
     end
 end
 
+get_times(traj::Trajectory) = [time(r) for r in traj.systems]
+
 function add_snapshot!(
     traj::Trajectory{D, F, SysType, L},
     s::System{D, F, SysType, L};
@@ -143,6 +145,8 @@ function add_snapshot!(
         end
         push!(traj.systems, s)
         push!(traj.reactions, length(traj.systems))
+        @assert allunique(traj.reactions)
+        @assert length(traj.reactions) == length(traj.systems)
     else
         #replica = System{D, F, SysType}()
         #set_box!(replica, box(s))
@@ -219,8 +223,15 @@ function latest_reaction(traj::Trajectory{D, F, SysType, L}, index::Integer) whe
     end
 
     # find `i` s.t. traj.reactions[i] <= index < traj.reactions[i+1]
-    ii = searchsortedlast(traj.reactions, index)
-    return traj.reactions[ii]
+    #ii = searchsortedlast(traj.reactions, index)
+    #return traj.reactions[ii]
+    i = findfirst(index < atreaction for atreaction in traj.reactions)
+    return if isnothing(i) || i==1
+        1
+    else
+        traj.reactions[i-1]
+    end
+
 end
 
 function is_reaction(s::System)
@@ -332,31 +343,28 @@ end
 function Base.iterate(st::SubTrajectory{D, F, S, L, R}) where {D, F<:AbstractFloat, S<:AbstractSystemType, L, R<:OrdinalRange}
     isempty(st.traj_range) && return nothing
 
-    pseude_idx = 1
-    real_idx = st.traj_range[pseude_idx]
+    pseudo_idx = 1
+    real_idx = st.traj_range[pseudo_idx]
     reader = similar_system(st.traj)
     import_dynamic!(reader, st.traj, real_idx)
 
     rp = latest_reaction(st.traj, real_idx)
     import_static!(reader, st.traj, rp)
 
-    #return (step=get_timestep(st.traj, real_idx), snap=reader), (pseude_idx+1, reader)
-    return reader, (pseude_idx+1, reader)
+    return reader, (pseudo_idx+1, reader)
 end
 
 function Base.iterate(
     st::SubTrajectory{D, F, SysType, L, R},
     state::Tuple{Int64, S}
 ) where {D, F<:AbstractFloat, SysType<:AbstractSystemType, S<:AbstractSystem{D, F, SysType}, L, R<:OrdinalRange}
-    pseude_idx = state[1]
-    if pseude_idx <= length(st.traj_range)
-        real_idx = st.traj_range[pseude_idx]
-        reader = state[2]
+    pseudo_idx, reader = state
+    if pseudo_idx <= lastindex(st.traj_range)
+        real_idx = st.traj_range[pseudo_idx]
         rp = latest_reaction(st.traj, real_idx)
         import_static!(reader, st.traj, rp)
         import_dynamic!(reader, st.traj, real_idx)
-        #return (step=get_timestep(st.traj, real_idx), snap=reader), (pseude_idx+1, reader)
-        return reader, (pseude_idx+1, reader)
+        return reader, (pseudo_idx+1, reader)
     else
         return nothing
     end
@@ -386,12 +394,25 @@ function wrapped(st::SubTrajectory{D, F, S, L, R}) where {D, F<:AbstractFloat, S
     return wrapped(st.traj)
 end
 
+get_times(st::SubTrajectory) = [time(r) for (i, r) in enumerate(st.traj) if i in st.traj_range]
+natom(st::SubTrajectory) = natom(st.traj.systems[1])
+
 function latest_reaction(st::SubTrajectory{D, F, S, L, R}, index::Integer) where {D, F<:AbstractFloat, S<:AbstractSystemType, L, R<:OrdinalRange}
     if index ∉ 1:length(st)
         error("index $index ∉ $(st.traj_range)")
     end
 
     # find `i` s.t. traj.reactions[i] <= index < traj.reactions[i+1]
-    ii = searchsortedlast(st.traj.reactions, st.traj_range[index])
-    return st.traj.reactions[ii]
+    #ii = searchsortedlast(st.traj.reactions, st.traj_range[index])
+    #return st.traj.reactions[ii]
+
+    # Since traj_range can be 1:5:end, reaction can occurs at index i s.t. i ∉ traj_range
+    # To provide correct snapshot at index i, search reaction from the whole (not sliced) traj_range
+    idx = st.traj_range[index]
+    i = findfirst(idx < atreaction for atreaction in st.traj.reactions)
+    return if isnothing(i) || i==1
+        1
+    else
+        st.traj.reactions[i-1]
+    end
 end

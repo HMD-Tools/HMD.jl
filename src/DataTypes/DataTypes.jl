@@ -24,7 +24,8 @@ using Unitful
 using ..HierarchyLabels
 using ..TopologyGraphs
 
-@reexport import Base: *, +, -, /, <, <=, ==, >, >=, close, contains, convert, getindex,firstindex, lastindex, iterate,
+@reexport import Base: *, +, -, /, <, <=, ==, >, >=, close, contains, convert,
+    getindex, firstindex, lastindex, iterate, eachindex,
     length, position, precision, promote_rule, promote_type, setproperty!, show, similar,
     string, time, ∈, ∉, merge!, println, append!, replace!
 
@@ -137,6 +138,7 @@ using ..TopologyGraphs
     get_metadata,
     h5traj_reader
 
+
 # core subtype signature
 export Position, BoundingBox, HLabel, LabelHierarchy
 
@@ -146,8 +148,8 @@ export GeneralSystem, System, print_to_string
 
 # fileIO
 export H5traj, SerializedTopology, PackedHierarchy
-export h5traj, H5trajReader, get_file, read_traj
-export read_snapshot!
+export h5traj, H5trajReader, SubH5trajReader, get_file, read_traj
+export read_snapshot!, partial_read
 
 #constants
 export Entire_System, BO_Precision, atom_mass, Atom_Label, Atomic_Number_Precision

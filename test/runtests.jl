@@ -317,15 +317,15 @@ end
 
 @testset "HMD.jl" begin
     @testset "TopologyGraphs" begin
-        #HMD.TopologyGraphs.test()
+        HMD.TopologyGraphs.test()
     end
 
     @testset "HierarchyHLabels" begin
-        #HMD.DataTypes.HierarchyLabels.test()
+        HMD.DataTypes.HierarchyLabels.test()
     end
 
     @testset "label manipulation" begin
-        #include("label_manipulation.jl")
+        include("label_manipulation.jl")
     end
 
     @testset "trajectory" begin

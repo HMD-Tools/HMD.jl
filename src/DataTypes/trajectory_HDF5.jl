@@ -11,17 +11,52 @@ function serialize(vec::Vector{SVector{D, T}}, Tconvert=T) where {D, T<:Real}
     return spos
 end
 
-function _get_snap(props::HDF5.Dataset, i::Integer, Natom::Integer, D::Integer, F::Type{<:AbstractFloat})
+
+function _get_snap(
+    props::HDF5.Dataset,
+    i::Integer,     # snapshot index (1-origin)
+    Natom::Integer, # number of atoms in each snapshots
+    D::Integer,     # system dimension
+    F::Type{<:AbstractFloat}, # system precision
+    chunk::UnitRange{T} = 1:Natom
+) where {T<:Integer}
     if D <= 0
-        error("dimension D must be >= 1. ")
+        error("dimension D must be >= 1, found $D. ")
+    elseif chunk.stop ≤ chunk.start
+        error("chunk.stop must be >= chunk.start, found $chunk.")
+    elseif chunk.start < 1 || chunk.stop > Natom
+        error("chunk must be within 1:$Natom, found $chunk. ")
     end
 
-    start = D * (i-1) * Natom + 1
-    stop = D * i * Natom
+    start = 1 + (D * (i-1) * Natom) + D * (chunk.start - 1)
+    stop  = start + D * length(chunk) - 1
+    #@assert (start - 1) % 3 == 0 "$start % 3 != 0"
+    #@assert stop % 3 == 0 "$stop % 3 != 0"
 
+    # Never remove ::Vector{F} because
+    # reinterpret(::Type{SVector{D, F}}, arr::Vector{F1}) will
+    # return invalid result if F1 != F
+    # e.g. try `reinterpret(SVector{3, Int32}, [1,2,3])`
     arr::Vector{F} = props[start:stop, 1]
+
+    # padding zeros if chunk is not full
+    if chunk.start != 1
+        prepend!(
+            arr,
+            zeros(F, D * (chunk.start - 1))
+        )
+    end
+    if chunk.stop != Natom
+        append!(
+            arr,
+            zeros(F, D * (Natom - chunk.stop))
+        )
+    end
+    @assert length(arr) == D * Natom
+
     return reinterpret(SVector{D, F}, arr)
 end
+
 
 
 # TODO: IOの中間メモリ確保量の低減(Serialized typeがなくなってロジックだけになるので可読性確保の工夫が必要)
@@ -361,6 +396,7 @@ function h5traj_reader(name::AbstractString, D::Integer, F::Type{<:AbstractFloat
     #end
     elems::Vector{Atomic_Number_Precision} = read(file, "elements")
     reactions::Vector{Int64} = let
+        # if reaction is occured at step i, the dataset "topology/i" exists
         entries::Base.KeySet{String, Dict{String, Any}} = keys(read(file, "topology"))
         sort!([parse(Int64, str) for str in entries])
     end
@@ -390,9 +426,18 @@ function h5traj_reader(name::AbstractString, D::Integer, F::Type{<:AbstractFloat
 
     #@assert length(timesteps) == length(times)
     @assert length(reactions) <= length(times)
+    @assert allunique(reactions)
 
     return H5trajReader{D, F, S, D*D}(file, times, elems, reactions, boxes, Nsnap, Natom, has_v, has_f, hnames, atomprops)
 end
+
+eachindex(hmdfile::H5trajReader) = 1:hmdfile.Nsnap
+length(hmdfile::H5trajReader) = hmdfile.Nsnap
+natom(hmdfile::H5trajReader) = hmdfile.Natom
+get_times(hmdfile::H5trajReader) = deepcopy(hmdfile.times) # must be deepcopy for compatibility with SubH5trajReader
+firstindex(hmdfile::H5trajReader) = 1
+lastindex(hmdfile::H5trajReader) = hmdfile.Nsnap
+
 
 function read_traj(
     name::AbstractString,
@@ -434,6 +479,7 @@ function read_traj!(
             traj.systems[i].force = _get_snap(hmdfile.atomprops["force"], i, hmdfile.Natom, D, F)
         end
     end
+
     # static properties
     for rp in hmdfile.reactions
         traj.systems[rp].topology = _read_topology(hmdfile.file, rp)
@@ -443,6 +489,10 @@ function read_traj!(
         traj.systems[rp].element = hmdfile.elems
     end
     println()
+
+    @assert length(traj.systems) == hmdfile.Nsnap
+    @assert allunique(traj.reactions)
+    @assert issorted(traj.reactions)
 
     return nothing
 end
@@ -473,15 +523,34 @@ end
 function read_snapshot!(
     reader::System{D, F, S, L},
     hmdfile::H5trajReader{D, F, S, L},
-    index::Integer
-) where {D, F<:AbstractFloat, S<:AbstractSystemType, L}
+    index::Integer,
+    chunk::UnitRange{T} = 1:natom(hmdfile)
+) where {D, F<:AbstractFloat, S<:AbstractSystemType, L, T<:Integer}
+
+    is_read_firsttime = if isempty(all_elements(reader)) && nv(topology(reader))==0 && isempty(hierarchy_names(reader))
+        true
+    elseif !isempty(all_elements(reader)) && nv(topology(reader))!=0 && !isempty(hierarchy_names(reader))
+        false
+    else
+        error("some of static properties are empty. trajectory may be broken. ")
+    end
+
     # static property
-    if searchsortedfirst(hmdfile.reactions, index) ≤ length(hmdfile.reactions)
-        reader.topology = _read_topology(hmdfile.file, index)
-        for hname in hmdfile.hnames
-            reader.hierarchy[hname] = _read_hierarchy(hmdfile.file, hname, index)
+    atreaction = searchsorted(hmdfile.reactions, index)
+    @assert length(atreaction) ≤ 1
+    if atreaction == index:index || is_read_firsttime
+        ii = if is_read_firsttime
+            j = findfirst(ireac -> index < ireac, hmdfile.reactions)
+            isnothing(j) ? hmdfile.reactions[end] : j
+        else
+            atreaction[1]
         end
-        reader.element = hmdfile.elems
+
+        reader.topology = _read_topology(hmdfile.file, ii)
+        for hname in hmdfile.hnames
+            reader.hierarchy[hname] = _read_hierarchy(hmdfile.file, hname, ii)
+        end
+        reader.element = deepcopy(hmdfile.elems)
     end
 
     #dynamic property
@@ -489,17 +558,115 @@ function read_snapshot!(
     set_box!(reader, _get_snap(hmdfile.boxes, index, D))
     reader.travel = zeros(SVector{D, Int16}, hmdfile.Natom)
     reader.wrapped = false
-    reader.position = _get_snap(hmdfile.atomprops["position"], index, hmdfile.Natom, D, F)
+    reader.position = _get_snap(hmdfile.atomprops["position"], index, hmdfile.Natom, D, F, chunk)
     if hmdfile.has_velocity
-        reader.velocity = _get_snap(hmdfile.atomprops["velocity"], index, hmdfile.Natom, D, F)
+        reader.velocity = _get_snap(hmdfile.atomprops["velocity"], index, hmdfile.Natom, D, F, chunk)
     end
     if hmdfile.has_force
-        reader.force = _get_snap(hmdfile.atomprops["force"], index, hmdfile.Natom, D, F)
+        reader.force = _get_snap(hmdfile.atomprops["force"], index, hmdfile.Natom, D, F, chunk)
     end
 
-    return nothing
+    return reader
 end
 
+
+struct SubH5trajReader{D, F, S, L, R<:OrdinalRange}
+    h5traj::H5trajReader{D, F, S, L}
+    time_range::R
+end
+
+
+function read_snapshot!(
+    reader::System{D, F, S, L},
+    hmdfile::SubH5trajReader{D, F, S, L, R},
+    pseudo_idx::Integer,
+    chunk::UnitRange{T} = 1:natom(hmdfile)
+) where {D, F<:AbstractFloat, S<:AbstractSystemType, L, T<:Integer, R}
+    real_idx = hmdfile.time_range[pseudo_idx]
+    return read_snapshot!(reader, hmdfile.h5traj, real_idx, chunk)
+end
+
+
+function Base.getindex(hmdfile::H5trajReader{D, F, S, L}, time_range::R) where {D, F, S, L, R<:OrdinalRange}
+    return SubH5trajReader{D, F, S, L, R}(hmdfile, time_range)
+end
+
+get_times(hmdfile::SubH5trajReader) = hmdfile.h5traj.times[hmdfile.time_range]
+length(hmdfile::SubH5trajReader) = length(hmdfile.time_range)
+natom(hmdfile::SubH5trajReader) = hmdfile.h5traj.Natom
+time_range(hmdfile::SubH5trajReader) = hmdfile.time_range
+
+
+function Base.iterate(hmdfile::SubH5trajReader{D,F,S,L,R}) where {D,F,S,L,R}
+    reader = System{D, F, S}()
+    read_snapshot!(reader, hmdfile.h5traj, first(hmdfile.time_range))
+
+    return reader, (firstindex(hmdfile.time_range)+1, reader)
+end
+
+
+function Base.iterate(
+    hmdfile::SubH5trajReader{D, F, S, L, R},
+    state::Tuple{Int64, System{D, F, S}}
+) where {D, F, S, L, R}
+    # pusedo index is the index of hmdfile.time_range
+    pseudo_idx, reader = state
+
+    # real index is the index of the whole trajectory
+    real_idx = time_range(hmdfile)[pseudo_idx]
+
+    if pseudo_idx > lastindex(hmdfile.time_range)
+        return nothing
+    else
+        read_snapshot!(reader, hmdfile.h5traj, real_idx)
+        return reader, (pseudo_idx+1, reader)
+    end
+end
+
+
+struct ChunkedH5trajReader{D, F, S, L, R}
+    h5traj::SubH5trajReader{D, F, S, L, R}
+    atoms::UnitRange{Int64}
+end
+
+function partial_read(hmdfile::SubH5trajReader{D, F, S, L, R}, atoms) where {D, F, S, L, R}
+    return ChunkedH5trajReader(hmdfile, atoms)
+end
+
+function partial_read(hmdfile::H5trajReader{D, F, S, L}, atoms) where {D, F, S, L}
+    sub_hmdfile = hmdfile[eachindex(hmdfile)]
+    return ChunkedH5trajReader(sub_hmdfile, atoms)
+end
+
+
+function Base.iterate(chunked_traj::ChunkedH5trajReader{D, F, S, L, R}) where {D, F, S, L, R}
+    reader = System{D, F, S}()
+    hmdfile = chunked_traj.h5traj
+    read_snapshot!(reader, hmdfile, first(time_range(hmdfile)), chunked_traj.atoms)
+
+    return reader, (firstindex(hmdfile.time_range)+1, reader)
+end
+
+
+function Base.iterate(
+    chunked_traj::ChunkedH5trajReader{D, F, S, L, R},
+    state::Tuple{Int64, System{D, F, S}}
+) where {D, F, S, L, R}
+    hmdfile = chunked_traj.h5traj
+
+    # pusedo index is the index of hmdfile.time_range
+    pseudo_idx, reader = state
+
+    if pseudo_idx > lastindex(hmdfile.time_range)
+        return nothing
+    else
+        # real index is the index of the whole trajectory
+        real_idx = time_range(hmdfile)[pseudo_idx]
+
+        read_snapshot!(reader, hmdfile, real_idx, chunked_traj.atoms)
+        return reader, (pseudo_idx+1, reader)
+    end
+end
 
 
 function _import_dynamic!(

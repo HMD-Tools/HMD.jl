@@ -12,7 +12,7 @@ using StaticArrays
 using Unitful
 
 
-@reexport import Base: getindex, firstindex, lastindex, setproperty!, iterate, length, precision, close, string, show, showerror, append!
+@reexport import Base: getindex, firstindex, lastindex, setproperty!, iterate, length, precision, close, string, show, showerror, append!, eachindex, lastindex, firstindex
 @reexport import Base: >, <, >=, <=, +, -, *, /, ==, position
 @reexport import Base: time, contains, promote_type, promote_rule, similar, merge!, replace!
 @reexport import Graphs: neighbors
