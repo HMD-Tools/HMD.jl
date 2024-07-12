@@ -35,9 +35,10 @@ function all_labels(s::System, hname::AbstractString)
 end
 
 function all_labels(s::System, hname::AbstractString, label_type::AbstractString)
-    labels = hierarchy(s, hname) |> HierarchyLabels._label2node |> keys |> collect
+    #labels = hierarchy(s, hname) |> HierarchyLabels._label2node |> keys |> collect
+    labels = hierarchy(s, hname) |> HierarchyLabels._labels
 
-    return filter!(label -> type(label)==label_type, labels)
+    return filter(label -> type(label)==label_type, labels)
 end
 
 function add_label!(s::System, hname::AbstractString, label::HLabel; unsafe::Bool=false)

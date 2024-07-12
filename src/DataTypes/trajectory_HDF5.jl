@@ -612,12 +612,12 @@ function Base.iterate(
     # pusedo index is the index of hmdfile.time_range
     pseudo_idx, reader = state
 
-    # real index is the index of the whole trajectory
-    real_idx = time_range(hmdfile)[pseudo_idx]
-
     if pseudo_idx > lastindex(hmdfile.time_range)
         return nothing
     else
+        # real index is the index of the whole trajectory
+        real_idx = time_range(hmdfile)[pseudo_idx]
+
         read_snapshot!(reader, hmdfile.h5traj, real_idx)
         return reader, (pseudo_idx+1, reader)
     end
